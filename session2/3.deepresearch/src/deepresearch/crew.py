@@ -83,14 +83,40 @@ critic_agent = Agent(
     tools=[TavilySearchTool()],
 )
 
+revision_agent = Agent(
+    role="Feedback Incorporation Specialist",
+    goal=(
+        "Produce the final, publication-ready research article by incorporating the critic's "
+        "feedback into the article written by the Research Article Writer. You receive two inputs: "
+        "(1) the article drafted by the writer, and (2) the structured critique from the critic. "
+        "Address every point of feedback specifically, and when the critique identifies missing, "
+        "unsupported, or outdated information, use web search to find authoritative sources and "
+        "fill the gaps with proper [Source: URL] citations. Your output is the final article."
+    ),
+    backstory=(
+        "You are a senior revision editor who specialises in taking a draft article together with "
+        "a reviewer's critique and turning it into a polished, fully-supported final piece. You "
+        "treat the critic's feedback as a checklist: for each point you make a concrete change to "
+        "the article. You are not afraid to run additional web searches to verify claims, replace "
+        "weak sources, or add the evidence the critic asked for. You preserve the writer's voice and "
+        "structure where it is strong, and you cite every factual claim with [Source: URL]. "
+        "Your revised article is the definitive final version — it must read as a complete, "
+        "standalone publication with no remaining open critique."
+    ),
+    llm=LLM(model=os.environ["MODEL_ID"], temperature=0.0),
+    tools=[TavilySearchTool()],
+)
+
 manager_agent = Agent(
     role="Deep Research Manager",
     goal=(
         "Orchestrate the full deep research workflow by delegating each step to the right specialist: "
         "planning to the Research Planner, investigation to the Research Investigator, "
-        "writing to the Article Writer, and critique to the Article Critic. "
-        "Ensure each step completes fully before the next begins, and drive the feedback loop "
-        "if the critic requests revisions."
+        "writing to the Article Writer, critique to the Article Critic, and final feedback "
+        "incorporation to the Feedback Incorporation Specialist. "
+        "Ensure each step completes fully before the next begins. The Feedback Incorporation "
+        "Specialist always produces the final article by applying the critic's feedback to the "
+        "writer's draft, and its output is the final deliverable."
     ),
     backstory=(
         "You are a senior research director who has led large investigative teams at top-tier "
@@ -100,7 +126,7 @@ manager_agent = Agent(
         "You are decisive and keep the team focused: you never allow a step to be skipped and "
         "you ensure the critic's feedback is fully acted on before the final article is delivered."
     ),
-    llm=LLM(model=os.environ["MODEL_ID"], temperature=0.0),
+    llm=LLM(model=os.environ["BETTER_MODEL_ID"], temperature=0.0),
     allow_delegation=True,
 )
 
@@ -113,39 +139,41 @@ research_task = Task(
         "that together provide comprehensive coverage of the topic. "
         "Output the numbered list of sub-questions before proceeding.\n\n"
         "Step 2 — Sub-Question Investigation\n"
-        "Work through each sub-question from Step 1 ONE AT A TIME. For each sub-question: "
+        "Work through each sub-question from Step 1 IN PARALLEL. For each sub-question: "
         "search for relevant sources, extract detailed content from the most promising URLs, "
         "and compile a comprehensive findings summary with inline [Source: URL] citations. "
         "Finish all research for one sub-question before moving to the next. "
         "Do NOT rely on prior knowledge — every fact must come from a retrieved source. "
         "Output a findings summary for each sub-question before proceeding.\n\n"
         "Step 3 — Article Writing\n"
-        "Using the sub-questions from Step 1 and the findings from Step 2, write a comprehensive "
+        "Using the sub-questions from Step 1 and all the findings from Step 2, write a comprehensive "
         "1500-3000 word research article in markdown format. Structure it with a compelling "
         "introduction, body sections aligned to each sub-question, inline [Source: URL] citations "
         "for every factual claim, and a concise conclusion. "
         "Do NOT invent facts — every claim must be grounded in the Step 2 findings.\n\n"
         "Step 4 — Critical Review (performed only once)\n"
-        "Critically review the article written in Step 3 for: factual support and citation "
-        "completeness, structural quality and logical coherence, coverage of all sub-questions, "
-        "and writing clarity.\n"
-        "  - If the article meets high publication standards, output the final markdown article "
-        "followed by the word APPROVED. You are done.\n"
-        "  - If the article needs improvement, list specific actionable feedback referencing exact "
-        "sentences or sections. Then immediately loop back to Step 1 — incorporate the feedback "
-        "into a revised research plan, re-execute Step 2 (re-investigate as needed) and Step 3 "
-        "(rewrite the article). After producing the revised article, output it as your final answer. "
-        "Do NOT run Step 4 again — the critical review happens only once."
+        "Have the Article Critic critically review the article written in Step 3 for: factual "
+        "support and citation completeness, structural quality and logical coherence, coverage of "
+        "all sub-questions, and writing clarity. The critic produces a structured critique with "
+        "specific, actionable feedback referencing exact sentences or sections (or notes that a "
+        "section is already strong). The critic does NOT rewrite the article.\n\n"
+        "Step 5 — Feedback Incorporation (final step)\n"
+        "Hand BOTH the article from Step 3 AND the critique from Step 4 to the Feedback "
+        "Incorporation Specialist. This specialist incorporates every point of the critic's "
+        "feedback into the article, using web search to source any missing, unsupported, or "
+        "outdated information and adding proper [Source: URL] citations. The specialist's revised "
+        "article is the FINAL deliverable — output it as the final answer. Do NOT loop back to "
+        "earlier steps after this."
     ),
     expected_output=(
-        "A complete research article in markdown format (1000-1500 words) with proper headings "
-        "and inline [Source: URL] citations, followed by either 'APPROVED' or a structured "
-        "critique with specific revision instructions."
+        "The final, publication-ready research article in markdown format (1000-1500 words) with "
+        "proper headings and inline [Source: URL] citations, produced by the Feedback "
+        "Incorporation Specialist after applying the critic's feedback to the writer's draft."
     ),
 )
 
 crew = Crew(
-    agents=[deep_research_planner, researcher_agent, writer_agent, critic_agent],
+    agents=[deep_research_planner, researcher_agent, writer_agent, critic_agent, revision_agent],
     tasks=[research_task],
     process=Process.hierarchical,
     manager_agent=manager_agent,
