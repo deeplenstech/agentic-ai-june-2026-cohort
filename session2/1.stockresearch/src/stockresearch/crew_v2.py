@@ -6,9 +6,6 @@ from crewai import LLM, Agent, Crew, Task
 
 from .tools.date_tool import GetCurrentDateTool
 from .tools.stock_tool import GetStockPriceTool
-# from .utils import (
-#     bedrock_patches,  # noqa: F401 — applies Bedrock monkey-patches on import
-# )
 
 stock_research_agent = Agent(
     role="Senior Financial Research Analyst",

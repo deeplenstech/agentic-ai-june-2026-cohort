@@ -6,9 +6,6 @@ from crewai import LLM, Agent, Crew, Task
 from crewai_tools import TavilySearchTool
 
 from .tools.date_tool import GetCurrentDateTool
-# from .utils import (
-#     bedrock_patches,  # noqa: F401 — applies Bedrock monkey-patches on import
-# )
 
 generalist_agent = Agent(
     role="Generalist Agent",

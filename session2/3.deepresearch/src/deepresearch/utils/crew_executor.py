@@ -28,7 +28,7 @@ if os.getenv("LANGFUSE_PUBLIC_KEY"):
         headers={
             "Authorization": f"Basic {auth_header}",
             "x-langfuse-ingestion-version": "4"
-        },
+        }
     )
     provider = TracerProvider()
     provider.add_span_processor(BatchSpanProcessor(exporter))
@@ -48,27 +48,27 @@ if os.getenv("LANGFUSE_PUBLIC_KEY"):
     LLMOtelListener()
 
 
-def execute_crew(crew):
-    tracer = otel_trace.get_tracer("stockresearch")
+async def execute_crew(crew):
+    tracer = otel_trace.get_tracer("deepresearch")
 
     console = Console()
     console.print(
-        "[bold magenta]Welcome to the Stock Research Chatbot. [/bold magenta]\n"
+        "[bold magenta]Welcome to the Deep Research Chatbot. [/bold magenta]\n"
     )
     user_query = console.input("[bold yellow]User:[/bold yellow] ").strip()
     inputs = {"user_query": user_query}
 
-    with tracer.start_as_current_span("stock-research") as span:
+    with tracer.start_as_current_span("deep-research") as span:
         try:
             span.set_attribute("input", str(inputs))
-            response = crew.kickoff(inputs=inputs).raw
+            response = (await crew.kickoff_async(inputs=inputs)).raw
             console.print("\n[bold green]Assitant:[/bold green]")
             console.print(Markdown(response))
             span.set_attribute("output", str(response or ""))
         except Exception as e:
             span.record_exception(e)
             console.print(
-                "\n[bold green]Assitant: An excepption occurred....[/bold green]"
+                "\n[bold green]Assitant: An exception occurred....[/bold green]"
             )
             console.print(Markdown(str(e)))
             raise Exception(f"An error occurred while running the crew: {e}")
