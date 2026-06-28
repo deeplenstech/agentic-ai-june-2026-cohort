@@ -81,14 +81,30 @@ To get your Langfuse keys:
 
 ## Running the Project
 
-To kickstart your crew of AI agents and begin task execution, run one of the crew scripts from the root folder of your project:
+To kickstart your crew of AI agents and begin task execution, run one of the crew scripts from the root folder of your project. Each command runs a different agent architecture, so you can compare them side by side:
 
 ```bash
+# V1 — Single generalist agent (web search only)
+$ uv run python -m src.stockresearch.crew_v1
+
+# V1 + Planning — same single agent, but plans its steps before acting
+$ uv run python -m src.stockresearch.crew_v1_with_planning
+
+# V2 — Single specialized Financial Analyst (custom stock tools, structured output)
+$ uv run python -m src.stockresearch.crew_v2
+
+# V3 — Hierarchical crew (Manager delegates to Analyst or Generalist)
 $ uv run python -m src.stockresearch.crew_v3
 ```
-*(You can also run `crew_v1` or `crew_v2` to explore different agent architectures)*
 
-This command initializes the stockResearch Crew, assembling the agent(s) and assigning them tasks as defined.
+How the versions differ:
+
+- **`crew_v1`** — A single generalist agent that answers broad queries using web search. The simplest setup; best for general information.
+- **`crew_v1_with_planning`** — The same single agent with CrewAI **planning** enabled. Before executing, the crew drafts a step-by-step plan, which can improve reasoning on multi-step queries at the cost of extra LLM calls. Use this to see the effect of planning versus the plain `crew_v1`.
+- **`crew_v2`** — A single **Senior Financial Research Analyst** with specialized tools (stock price, dates) that outputs data in structured markdown tables. More accurate for financial queries than `crew_v1`.
+- **`crew_v3`** — A **hierarchical** crew where a **Manager Agent** analyzes the query intent and delegates to the Financial Analyst (for stocks) or the Generalist (for broad topics). The most autonomous version; handles diverse queries.
+
+Each command initializes the stockResearch Crew, assembling the agent(s) and assigning them tasks as defined.
 
 The script will prompt you in the terminal for a user query. Below are example queries:
 1. Compare Google's (GOOGL) current stock price to its price exactly one month ago. 
@@ -109,16 +125,18 @@ In the Langfuse trace view you will see each LLM call, tool invocation, and inte
 
 ## Crew Versions
 
-This project includes three different versions of the crew to demonstrate the evolution of agentic architectures:
+This project includes several versions of the crew to demonstrate the evolution of agentic architectures:
 
-| Version | Architecture | Agents | Description |
-| :--- | :--- | :--- | :--- |
-| **V1** | **Single Agent** | Generalist Agent | A simple setup that uses a generalist agent to answer broad queries using web search. Best for general information. |
-| **V2** | **Single Agent** | Senior Financial Research Analyst | Focused specifically on financial data. It uses specialized tools to fetch stock prices and is prompted to output data in structured markdown tables. |
-| **V3** | **Hierarchical** | Manager, Financial Analyst, Generalist | The advanced version. A **Manager Agent** receives the user query, analyzes the intent, and delegates the task to either the Financial Analyst (for stocks) or the Generalist (for broad topics). |
+| Version | Command | Architecture | Agents | Description |
+| :--- | :--- | :--- | :--- | :--- |
+| **V1** | `crew_v1` | **Single Agent** | Generalist Agent | A simple setup that uses a generalist agent to answer broad queries using web search. Best for general information. |
+| **V1 + Planning** | `crew_v1_with_planning` | **Single Agent** | Generalist Agent | Same single agent as V1 with CrewAI **planning** enabled — the crew drafts a step-by-step plan before acting. Useful for comparing planned vs. unplanned reasoning. |
+| **V2** | `crew_v2` | **Single Agent** | Senior Financial Research Analyst | Focused specifically on financial data. It uses specialized tools to fetch stock prices and is prompted to output data in structured markdown tables. |
+| **V3** | `crew_v3` | **Hierarchical** | Manager, Financial Analyst, Generalist | The advanced version. A **Manager Agent** receives the user query, analyzes the intent, and delegates the task to either the Financial Analyst (for stocks) or the Generalist (for broad topics). |
 
 ### Key Differences
 - **Autonomy**: V1 and V2 are straightforward executions. V3 introduces a "Manager" that makes decisions about who should handle the work.
+- **Planning**: `crew_v1_with_planning` adds an explicit planning step before execution, while all other versions act directly on the query.
 - **Specialization**: V2 and V3 introduce a specialized Financial Analyst agent with custom tools for stock data, whereas V1 is a "jack of all trades".
 - **Complexity**: V3 demonstrates **hierarchical process** and **agent delegation**, allowing for more robust handling of diverse user queries.
 
