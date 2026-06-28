@@ -219,3 +219,7 @@ __marimo__/
 
 .DS_Store
 *-output.json
+
+cdk.out
+
+.backup
