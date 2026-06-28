@@ -17,7 +17,13 @@ First, if you haven't already, install uv:
 pip install uv
 ```
 
-Next, navigate to your project directory and install the dependencies:
+Next, navigate to the project folder:
+
+```bash
+cd session2/1.stockresearch
+```
+
+Then install the dependencies:
 
 (Optional) Lock the dependencies and install them by using the CLI command:
 ```bash
@@ -109,6 +115,14 @@ Each command initializes the stockResearch Crew, assembling the agent(s) and ass
 The script will prompt you in the terminal for a user query. Below are example queries:
 1. Compare Google's (GOOGL) current stock price to its price exactly one month ago. 
 2. What is the impact of AI on the stock prices?
+
+> **Tip for the generalist agent (`crew_v1` and `crew_v1_with_planning`):** because the generalist agent has no specialized tools or structured-output prompting, a short query may produce vague results. Giving it a more detailed prompt — specifying the role, the action, and the expected output format — yields much better answers. For example:
+>
+> **Role:** You are a senior financial research assistant at a top investment firm.
+>
+> **Action:** Compare Google's (GOOGL) current stock price to its price exactly one month ago.
+>
+> **Expectation:** Provide the comparison in a clear, concise format. Include the current closing price, the previous month's closing price, the dollar difference, and the percentage change. Present the numerical data in a markdown table.
 
 ## Observing the ReAct Cycle in Langfuse
 
