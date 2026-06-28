@@ -67,13 +67,13 @@ MODEL_ID=bedrock/us.anthropic.claude-haiku-4-5-20251001-v1:0
 CDK bootstrap provisions S3 and ECR assets in your AWS account. Run once per account/region:
 
 ```bash
-cdk bootstrap
+uv run cdk bootstrap
 ```
 
 ### 2. Synthesize (optional — preview CloudFormation template)
 
 ```bash
-cdk synth
+uv run cdk synth
 ```
 
 ### 3. Deploy

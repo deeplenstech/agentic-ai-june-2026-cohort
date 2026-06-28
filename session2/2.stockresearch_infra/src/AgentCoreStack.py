@@ -7,7 +7,7 @@ from aws_cdk import (
     Stack,
 )
 from aws_cdk import (
-    aws_bedrockagentcore as bedrockagentcore,
+    aws_bedrockagentcore as agentcore,
 )
 from aws_cdk import (
     aws_ecr_assets as ecr_assets,
@@ -17,7 +17,7 @@ from aws_cdk import (
 )
 from constructs import Construct
 
-# Load SERPER_API_KEY from 1.stockresearch/.env if the file exists, else blank.
+# Load TAVILY_API_KEY from 1.stockresearch/.env if the file exists, else blank.
 _env_file = Path(__file__).parent / ".." / ".." / "1.stockresearch" / ".env"
 _tavily_api_key = ""
 try:
@@ -30,182 +30,44 @@ except FileNotFoundError:
 
 
 class AgentCoreStack(Stack):
+    """Deploys the Stock Research agent on Amazon Bedrock AgentCore Runtime.
+
+    Uses the L2 ``Runtime`` construct (same approach as the TypeScript stack): it
+    builds the ARM64 container from 1.stockresearch/Dockerfile, pushes it to a
+    CDK-managed ECR, and auto-provisions the execution role with the baseline
+    permissions (CloudWatch logs, ECR pull, X-Ray tracing). The only policy we add
+    by hand is Bedrock model invoke -- everything else is handled by the construct.
+    """
+
     def __init__(self, scope: Construct, construct_id: str, **kwargs) -> None:
         super().__init__(scope, construct_id, **kwargs)
 
-        # Get account and region info
-        account = Stack.of(self).account
-        region = Stack.of(self).region
-
-        # Run local command before building to update requirements.txt
+        # Refresh requirements.txt for the Docker build before bundling the asset.
         subprocess.run(["sh", "generateRequirements.sh"], check=True, cwd=".")
 
-        # Build and push Docker image from agents directory
-        docker_image = ecr_assets.DockerImageAsset(
-            self,
-            "StockResearchDockerImage",
-            directory=os.path.join(
-                os.path.dirname(__file__), "..", "..", "1.stockresearch"
-            ),
+        # Container image -- built from 1.stockresearch/Dockerfile, pushed to ECR, ARM64
+        # (AgentCore Runtime requires linux/arm64).
+        artifact = agentcore.AgentRuntimeArtifact.from_asset(
+            os.path.join(os.path.dirname(__file__), "..", "..", "1.stockresearch"),
+            platform=ecr_assets.Platform.LINUX_ARM64,
             asset_name="stockresearch-images",
         )
 
-        # IAM execution role for AgentCore runtime
-        execution_role = iam.Role(
-            self,
-            "StockResearchAgentCoreExecutionRole",
-            assumed_by=iam.ServicePrincipal(
-                "bedrock-agentcore.amazonaws.com",
-                conditions={
-                    "StringEquals": {"aws:SourceAccount": account},
-                    "ArnLike": {
-                        "aws:SourceArn": f"arn:aws:bedrock-agentcore:{region}:{account}:*"
-                    },
-                },
-            ),
-            description="Execution role for Amazon Bedrock AgentCore runtime",
-        )
-
-        execution_role.add_to_policy(
-            iam.PolicyStatement(
-                effect=iam.Effect.ALLOW,
-                actions=["logs:DescribeLogStreams", "logs:CreateLogGroup"],
-                resources=[
-                    f"arn:aws:logs:{region}:{account}:log-group:/aws/bedrock-agentcore/runtimes/*"
-                ],
-            )
-        )
-
-        execution_role.add_to_policy(
-            iam.PolicyStatement(
-                effect=iam.Effect.ALLOW,
-                actions=["logs:DescribeLogGroups"],
-                resources=[f"arn:aws:logs:{region}:{account}:log-group:*"],
-            )
-        )
-
-        execution_role.add_to_policy(
-            iam.PolicyStatement(
-                effect=iam.Effect.ALLOW,
-                actions=["logs:CreateLogStream", "logs:PutLogEvents"],
-                resources=[
-                    f"arn:aws:logs:{region}:{account}:log-group:/aws/bedrock-agentcore/runtimes/*:log-stream:*"
-                ],
-            )
-        )
-
-        execution_role.add_to_policy(
-            iam.PolicyStatement(
-                effect=iam.Effect.ALLOW,
-                actions=["ecr:GetAuthorizationToken"],
-                resources=["*"],
-            )
-        )
-
-        execution_role.add_to_policy(
-            iam.PolicyStatement(
-                effect=iam.Effect.ALLOW,
-                actions=["ecr:BatchGetImage", "ecr:GetDownloadUrlForLayer"],
-                resources=[docker_image.repository.repository_arn],
-            )
-        )
-
-        execution_role.add_to_policy(
-            iam.PolicyStatement(
-                effect=iam.Effect.ALLOW,
-                actions=[
-                    "xray:PutTraceSegments",
-                    "xray:PutTelemetryRecords",
-                    "xray:GetSamplingRules",
-                    "xray:GetSamplingTargets",
-                ],
-                resources=["*"],
-            )
-        )
-
-        execution_role.add_to_policy(
-            iam.PolicyStatement(
-                effect=iam.Effect.ALLOW,
-                actions=["cloudwatch:PutMetricData"],
-                resources=["*"],
-                conditions={
-                    "StringEquals": {"cloudwatch:namespace": "bedrock-agentcore"}
-                },
-            )
-        )
-
-        execution_role.add_to_policy(
-            iam.PolicyStatement(
-                effect=iam.Effect.ALLOW,
-                actions=["bedrock-agentcore:GetResourceApiKey"],
-                resources=[
-                    f"arn:aws:bedrock-agentcore:{region}:{account}:token-vault/default",
-                    f"arn:aws:bedrock-agentcore:{region}:{account}:token-vault/default/apikeycredentialprovider/*",
-                    f"arn:aws:bedrock-agentcore:{region}:{account}:workload-identity-directory/default",
-                    f"arn:aws:bedrock-agentcore:{region}:{account}:workload-identity-directory/default/workload-identity/stock_research_agent*",
-                ],
-            )
-        )
-
-        execution_role.add_to_policy(
-            iam.PolicyStatement(
-                effect=iam.Effect.ALLOW,
-                actions=["bedrock-agentcore:GetResourceOauth2Token"],
-                resources=[
-                    f"arn:aws:bedrock-agentcore:{region}:{account}:token-vault/default",
-                    f"arn:aws:bedrock-agentcore:{region}:{account}:token-vault/default/oauth2credentialprovider/*",
-                    f"arn:aws:bedrock-agentcore:{region}:{account}:workload-identity-directory/default",
-                    f"arn:aws:bedrock-agentcore:{region}:{account}:workload-identity-directory/default/workload-identity/stock_research_agent*",
-                ],
-            )
-        )
-
-        execution_role.add_to_policy(
-            iam.PolicyStatement(
-                effect=iam.Effect.ALLOW,
-                actions=[
-                    "bedrock-agentcore:GetWorkloadAccessToken",
-                    "bedrock-agentcore:GetWorkloadAccessTokenForJWT",
-                    "bedrock-agentcore:GetWorkloadAccessTokenForUserId",
-                ],
-                resources=[
-                    f"arn:aws:bedrock-agentcore:{region}:{account}:workload-identity-directory/default",
-                    f"arn:aws:bedrock-agentcore:{region}:{account}:workload-identity-directory/default/workload-identity/stock_research_agent*",
-                ],
-            )
-        )
-
-        execution_role.add_to_policy(
-            iam.PolicyStatement(
-                effect=iam.Effect.ALLOW,
-                actions=[
-                    "bedrock:InvokeModel",
-                    "bedrock:InvokeModelWithResponseStream",
-                    "bedrock:ApplyGuardrail",
-                ],
-                resources=[
-                    "arn:aws:bedrock:*::foundation-model/*",
-                    "arn:aws:bedrock:*:*:inference-profile/*",
-                    f"arn:aws:bedrock:{region}:{account}:*",
-                ],
-            )
-        )
-
-        # Create the AgentCore Runtime with IAM authentication
-        agentcore_runtime = bedrockagentcore.CfnRuntime(
+        # The AgentCore Runtime. The L2 construct creates the execution role and
+        # grants the baseline logs / ECR / X-Ray permissions itself, so we don't
+        # hand-roll any of that boilerplate.
+        runtime = agentcore.Runtime(
             self,
             "StockResearchAgentCoreRuntime",
-            agent_runtime_name="stock_research_agent",
+            runtime_name="stock_research_agent_june",
             description="Stock Research agent with IAM authentication",
-            role_arn=execution_role.role_arn,
-            agent_runtime_artifact=bedrockagentcore.CfnRuntime.AgentRuntimeArtifactProperty(
-                container_configuration=bedrockagentcore.CfnRuntime.ContainerConfigurationProperty(
-                    container_uri=docker_image.image_uri,
-                )
-            ),
+            agent_runtime_artifact=artifact,
+            protocol_configuration=agentcore.ProtocolType.HTTP,
+            network_configuration=agentcore.RuntimeNetworkConfiguration.using_public_network(),
+            tracing_enabled=True,
             environment_variables={
-                "AWS_REGION": region,
-                "AWS_DEFAULT_REGION": region,
+                "AWS_REGION": self.region,
+                "AWS_DEFAULT_REGION": self.region,
                 "CREWAI_DISABLE_TELEMETRY": "true",
                 "LITELLM_LOCAL_MODEL_COST_MAP": "true",
                 "OTEL_TRACES_SAMPLER": "always_on",
@@ -213,42 +75,41 @@ class AgentCoreStack(Stack):
                 "TAVILY_API_KEY": _tavily_api_key,
                 "MODEL_ID": "bedrock/us.anthropic.claude-haiku-4-5-20251001-v1:0",
             },
-            network_configuration=bedrockagentcore.CfnRuntime.NetworkConfigurationProperty(
-                network_mode="PUBLIC"
-            ),
         )
 
-        # Ensure the runtime is created only after the role and its policies are fully attached
-        agentcore_runtime.node.add_dependency(execution_role)
+        # The one permission that isn't baseline: invoke the Bedrock model. The
+        # cross-region inference profile (us.anthropic.*) fans out to foundation
+        # models in multiple regions, so allow both resource shapes.
+        runtime.add_to_role_policy(
+            iam.PolicyStatement(
+                actions=[
+                    "bedrock:InvokeModel",
+                    "bedrock:InvokeModelWithResponseStream",
+                ],
+                resources=[
+                    "arn:aws:bedrock:*::foundation-model/*",
+                    f"arn:aws:bedrock:*:{self.account}:inference-profile/*",
+                ],
+            )
+        )
 
-        # Using the DEFAULT endpoint. AgentCore automatically routes to the latest version.
-
-        # Outputs
+        # Outputs used by the invoke scripts and the README walkthrough.
         CfnOutput(
             self,
             "AgentCoreRuntimeArn",
-            value=agentcore_runtime.attr_agent_runtime_arn,
+            value=runtime.agent_runtime_arn,
             description="ARN of the AgentCore Runtime",
             export_name="AgentCoreRuntimeArn",
         )
-
         CfnOutput(
             self,
             "AgentCoreRuntimeId",
-            value=agentcore_runtime.attr_agent_runtime_id,
+            value=runtime.agent_runtime_id,
             description="ID of the AgentCore Runtime",
         )
-
-        CfnOutput(
-            self,
-            "ECRRepositoryUri",
-            value=docker_image.repository.repository_arn,
-            description="ECR Repository ARN for the agent container",
-        )
-
         CfnOutput(
             self,
             "ExecutionRoleArn",
-            value=execution_role.role_arn,
+            value=runtime.role.role_arn,
             description="ARN of the AgentCore Execution Role",
         )
