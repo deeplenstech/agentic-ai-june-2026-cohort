@@ -223,3 +223,6 @@ __marimo__/
 cdk.out
 
 .backup
+.out.txt
+# We don't use requirements.txt for project dependencies
+requirements.txt
