@@ -35,17 +35,25 @@ if os.getenv("LANGFUSE_PUBLIC_KEY"):
     otel_trace.set_tracer_provider(provider)
 
     from openinference.instrumentation.crewai import CrewAIInstrumentor
+    from openinference.instrumentation.litellm import LiteLLMInstrumentor
 
-    # Instrument CrewAI orchestration spans (agents, tasks, crew)
+    # LLM spans come from LiteLLM, NOT from CrewAI's event bus.
+    #
+    # CrewAI 1.15 only emits an LLMCallCompletedEvent for the *final* answer:
+    # when a response contains tool calls it runs the tool and returns early
+    # without emitting completed (see crewai/llm.py _handle_non_streaming_response).
+    # So any event-bus-based tracer can only ever show the last LLM call. Because
+    # get_llm() sets is_litellm=True, every call (tool-reasoning steps included)
+    # goes through litellm.completion, so we instrument there to capture them all
+    # with token usage.
+    #
+    # CrewAIInstrumentor stays in its default wrapper mode (no use_event_listener):
+    # it wraps crew/agent/task/tool with real context managers, so the LiteLLM
+    # spans nest correctly under the active agent span. Enabling the event
+    # listener here would (a) duplicate/double-count the final call and (b) leave
+    # LiteLLM spans un-nested, so we deliberately do not.
     CrewAIInstrumentor().instrument()
-
-    from .llm_otel_listener import LLMOtelListener
-
-    # Subscribe to CrewAI's event bus to create OTEL spans for LLM calls.
-    # CrewAI 0.186+ uses provider-native SDKs (e.g. AnthropicCompletion) and
-    # bypasses litellm entirely, so litellm instrumentation has no effect.
-    # The event bus is the only reliable hook into LLM calls at this version.
-    LLMOtelListener()
+    LiteLLMInstrumentor().instrument()
 
 
 def execute_crew(crew):

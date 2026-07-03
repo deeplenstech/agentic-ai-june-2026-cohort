@@ -22,4 +22,4 @@ Browse through these resources to build helpful context before diving into the a
 Head over to [prompts/README.md](prompts/README.md) to explore prompt engineering exercises. These cover techniques for writing effective prompts and understanding how small changes in phrasing affect model output.
 
 ### 2. Direct calls to LLMs
-Try running the scripts yourself — see the [Scripts section](1.prompts/README.md#scripts) of the prompts README, which walks through them step by step. You may also try out the ReAct loop example. ReAct wasn't fully covered in session 1, so go ahead and experiment with it on your own to see how the loop works.
+Try running the scripts yourself — see the [Scripts section](1.prompts/README.md#scripts) of the prompts README, which walks through them step by step. You may also try out the ReAct loop example. There is a video demoing this react loop simuation in the session 2 videos. You may refer to that to understand nuances to simulate this react loop.

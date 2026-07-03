@@ -1,8 +1,7 @@
-import os
-
 from .utils.crew_executor import execute_crew
+from .utils.llm_factory import get_llm
 
-from crewai import LLM, Agent, Crew, Task
+from crewai import Agent, Crew, Task
 
 from .tools.date_tool import GetCurrentDateTool
 from .tools.stock_tool import GetStockPriceTool
@@ -15,7 +14,7 @@ stock_research_agent = Agent(
         "analysis. You have a knack of fetching historical stock data to provide "
         "accurate analysis based on the user query"
     ),
-    llm=LLM(model=os.environ["MODEL_ID"], temperature=0.0),
+    llm=get_llm(temperature=0.0),
     tools=[GetCurrentDateTool(), GetStockPriceTool()],
 )
 

@@ -1,8 +1,7 @@
-import os
-
 from .utils.crew_executor import execute_crew
+from .utils.llm_factory import get_llm
 
-from crewai import LLM, Agent, Crew, Task
+from crewai import Agent, Crew, Task
 from crewai_tools import TavilySearchTool
 
 from .tools.date_tool import GetCurrentDateTool
@@ -11,7 +10,7 @@ generalist_agent = Agent(
     role="Generalist Agent",
     goal="Answer general questions based on user query. You must use Tavily search to get latest data.",
     backstory="",
-    llm=LLM(model=os.environ["MODEL_ID"], temperature=0.0),
+    llm=get_llm(temperature=0.0),
     tools=[GetCurrentDateTool(), TavilySearchTool()],
 )
 
