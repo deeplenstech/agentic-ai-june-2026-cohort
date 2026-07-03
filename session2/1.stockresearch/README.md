@@ -9,7 +9,7 @@ This project explores different CrewAI configurations to automate stock research
 
 ## Installation
 
-Ensure you have Python >=3.10 <3.14 installed on your system. This project uses [UV](https://docs.astral.sh/uv/) for dependency management and package handling, offering a seamless setup and execution experience.
+Ensure you have Python >=3.10 <3.13 installed on your system. This project uses [UV](https://docs.astral.sh/uv/) for dependency management and package handling, offering a seamless setup and execution experience.
 
 First, if you haven't already, install uv:
 
@@ -25,9 +25,10 @@ cd session2/1.stockresearch
 
 Then install the dependencies:
 
-(Optional) Lock the dependencies and install them by using the CLI command:
+Lock the dependencies and install them by using the CLI command:
 ```bash
-uv sync
+uv python pin 3.12
+uv --no-config sync
 ```
 ### Customizing
 
