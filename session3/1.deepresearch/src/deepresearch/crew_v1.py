@@ -23,7 +23,7 @@ deep_research_agent = Agent(
         "with [Source: URL], and before finishing you critically review your own draft "
         "and revise it to fix unsupported claims, weak structure, or citation gaps."
     ),
-    llm=get_llm(temperature=0.0, model_env="BETTER_MODEL_ID"),
+    llm=get_llm(temperature=0.0, model_env="MODEL_ID"),
     tools=[TavilySearchTool(), TavilyExtractorTool()],
 )
 
