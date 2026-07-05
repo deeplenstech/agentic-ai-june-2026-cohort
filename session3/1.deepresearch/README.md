@@ -64,6 +64,43 @@ MODEL_ID=openai/gpt-4o
 OPENAI_API_KEY=your_openai_api_key
 ```
 
+#### Using an OpenAI-compatible endpoint (e.g. Google Gemini)
+
+Some providers (Gemini, Groq, Together, OpenRouter, local vLLM/Ollama, …) expose an
+**OpenAI-compatible** API. To use one, set the model **and** a base URL in `.env`:
+
+```env
+MODEL_ID=openai/gemini-2.5-flash
+MODEL_API_KEY=your_gemini_api_key
+MODEL_BASE_URL=https://generativelanguage.googleapis.com/v1beta/openai/
+```
+
+**Why the `openai/` prefix matters (the trick).** CrewAI inspects the model string
+and, for a recognized provider prefix like `gemini/…`, tries to load that provider's
+**native SDK** — which fails unless you install the extra:
+
+```
+ImportError: Google Gen AI native provider not available, to install: uv add "crewai[google-genai]"
+```
+
+Do **not** install the native extra. This project routes every LLM call through
+**LiteLLM** (see [`utils/llm_factory.py`](src/deepresearch/utils/llm_factory.py),
+`is_litellm=True`), which is what our Langfuse instrumentation hooks into to capture
+each call and its token usage. The native provider bypasses LiteLLM, so tracing and
+token counts would break.
+
+Prefixing the model with `openai/` and supplying `MODEL_BASE_URL` makes CrewAI treat
+it as a generic OpenAI-compatible model and send it through LiteLLM to your endpoint —
+no native SDK, no code changes, and tracing keeps working. The same pattern works for
+any OpenAI-compatible provider: use `openai/<model-name>` plus that provider's base URL
+and key.
+
+> **Note:** Provider free tiers can be very restrictive (e.g. Gemini `gemini-2.5-flash`
+> free tier allows only ~20 requests/day *per model*). A single crew run makes several
+> LLM calls, and `NUM_RETRIES` in `llm_factory.py` means a rate-limited call retries
+> (each retry counts against quota). If you hit HTTP 429 `RESOURCE_EXHAUSTED`, switch to
+> a model that still has quota, enable billing, or wait for the daily reset.
+
 If you are using AWS Bedrock hosted models, you need to install and configure the AWS CLI by following the [official AWS CLI installation guide](https://docs.aws.amazon.com/cli/latest/userguide/getting-started-install.html). Once installed, run:
 
 ```bash
