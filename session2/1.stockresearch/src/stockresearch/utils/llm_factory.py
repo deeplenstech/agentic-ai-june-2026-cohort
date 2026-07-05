@@ -12,6 +12,25 @@ from crewai import LLM
 NUM_RETRIES = 3
 
 
+def _build_litellm_llm(kwargs: dict) -> LLM:
+    """Build a CrewAI LLM while keeping Gemini on LiteLLM.
+
+    CrewAI 1.15 imports its native Gemini provider before it honors
+    ``is_litellm=True``. That makes ``gemini/...`` model IDs fail unless the
+    native Google extra is installed, even though we want LiteLLM to handle the
+    call. Allocate with a neutral provider prefix, then initialize with the real
+    LiteLLM model so capability checks still see ``gemini/...``.
+    """
+    model = kwargs["model"]
+    if model.startswith(("gemini/", "google/")):
+        placeholder_model = f"litellm_passthrough/{model.rsplit('/', 1)[-1]}"
+        llm = LLM.__new__(LLM, model=placeholder_model, is_litellm=True)
+        LLM.__init__(llm, **kwargs)
+        return llm
+
+    return LLM(**kwargs)
+
+
 def get_llm(temperature: float = 0.0) -> LLM:
     """Build an LLM from ``MODEL_ID``.
 
@@ -34,4 +53,4 @@ def get_llm(temperature: float = 0.0) -> LLM:
     if base_url:
         kwargs["base_url"] = base_url
 
-    return LLM(**kwargs)
+    return _build_litellm_llm(kwargs)
