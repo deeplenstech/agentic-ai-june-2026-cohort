@@ -1,8 +1,7 @@
-import os
-
 from .utils.crew_executor import execute_crew
+from .utils.llm_factory import get_llm
 
-from crewai import LLM, Agent, Crew, Process, Task
+from crewai import Agent, Crew, Process, Task
 from crewai_tools import TavilySearchTool
 
 from .tools.date_tool import GetCurrentDateTool
@@ -19,7 +18,7 @@ stock_research_agent = Agent(
         "closing prices for the dates, the dollar difference, and the percentage "
         "change. Present the numerical data in a markdown table."
     ),
-    llm=LLM(model=os.environ["MODEL_ID"], temperature=0.0),
+    llm=get_llm(temperature=0.0),
     tools=[GetCurrentDateTool(), GetStockPriceTool()],
 )
 
@@ -32,7 +31,7 @@ generalist_agent = Agent(
         "provide accurate answers based on the user query. You provide the answers "
         "in a clear, concise format."
     ),
-    llm=LLM(model=os.environ["MODEL_ID"], temperature=0.0),
+    llm=get_llm(temperature=0.0),
     tools=[GetCurrentDateTool(), TavilySearchTool()],
 )
 
@@ -51,7 +50,7 @@ manager_agent = Agent(
         "specialist, review their outputs for completeness, and coordinate "
         "handoffs between specialists."
     ),
-    llm=LLM(model=os.environ["MODEL_ID"], temperature=0.0),
+    llm=get_llm(temperature=0.0),
     allow_delegation=True,
 )
 

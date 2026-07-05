@@ -28,7 +28,7 @@ if os.getenv("LANGFUSE_PUBLIC_KEY"):
         headers={
             "Authorization": f"Basic {auth_header}",
             "x-langfuse-ingestion-version": "4"
-        },
+        }
     )
     provider = TracerProvider()
     provider.add_span_processor(BatchSpanProcessor(exporter))
@@ -37,46 +37,35 @@ if os.getenv("LANGFUSE_PUBLIC_KEY"):
     from openinference.instrumentation.crewai import CrewAIInstrumentor
     from openinference.instrumentation.litellm import LiteLLMInstrumentor
 
-    # LLM spans come from LiteLLM, NOT from CrewAI's event bus.
-    #
-    # CrewAI 1.15 only emits an LLMCallCompletedEvent for the *final* answer:
-    # when a response contains tool calls it runs the tool and returns early
-    # without emitting completed (see crewai/llm.py _handle_non_streaming_response).
-    # So any event-bus-based tracer can only ever show the last LLM call. Because
-    # get_llm() sets is_litellm=True, every call (tool-reasoning steps included)
-    # goes through litellm.completion, so we instrument there to capture them all
-    # with token usage.
-    #
-    # CrewAIInstrumentor stays in its default wrapper mode (no use_event_listener):
-    # it wraps crew/agent/task/tool with real context managers, so the LiteLLM
-    # spans nest correctly under the active agent span. Enabling the event
-    # listener here would (a) duplicate/double-count the final call and (b) leave
-    # LiteLLM spans un-nested, so we deliberately do not.
+    # CrewAIInstrumentor wraps crew/agent/task/tool spans; LiteLLMInstrumentor
+    # captures every LLM call (with token usage). Because get_llm() sets
+    # is_litellm=True, all calls flow through litellm.completion, so the LiteLLM
+    # spans nest correctly under the active agent span.
     CrewAIInstrumentor().instrument()
     LiteLLMInstrumentor().instrument()
 
 
-def execute_crew(crew):
-    tracer = otel_trace.get_tracer("stockresearch")
+async def execute_crew(crew):
+    tracer = otel_trace.get_tracer("deepresearch")
 
     console = Console()
     console.print(
-        "[bold magenta]Welcome to the Stock Research Chatbot. [/bold magenta]\n"
+        "[bold magenta]Welcome to the Deep Research Chatbot. [/bold magenta]\n"
     )
     user_query = console.input("[bold yellow]User:[/bold yellow] ").strip()
     inputs = {"user_query": user_query}
 
-    with tracer.start_as_current_span("stock-research") as span:
+    with tracer.start_as_current_span("deep-research") as span:
         try:
             span.set_attribute("input", str(inputs))
-            response = crew.kickoff(inputs=inputs).raw
+            response = (await crew.kickoff_async(inputs=inputs)).raw
             console.print("\n[bold green]Assitant:[/bold green]")
             console.print(Markdown(response))
             span.set_attribute("output", str(response or ""))
         except Exception as e:
             span.record_exception(e)
             console.print(
-                "\n[bold green]Assitant: An excepption occurred....[/bold green]"
+                "\n[bold green]Assitant: An exception occurred....[/bold green]"
             )
             console.print(Markdown(str(e)))
             raise Exception(f"An error occurred while running the crew: {e}")
