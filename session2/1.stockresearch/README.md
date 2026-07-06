@@ -46,6 +46,10 @@ Then configure the following keys in your `.env` file:
 # Example: AWS Bedrock
 MODEL_ID=bedrock/us.anthropic.claude-haiku-4-5-20251001-v1:0
 
+# Example: Gemini through LiteLLM
+MODEL_ID=gemini/gemini-flash-latest
+MODEL_API_KEY=your_gemini_api_key
+
 # Example: Anthropic
 MODEL_ID=anthropic/claude-sonnet-4-6
 ANTHROPIC_API_KEY=your_anthropic_api_key
@@ -55,36 +59,29 @@ MODEL_ID=openai/gpt-4o
 OPENAI_API_KEY=your_openai_api_key
 ```
 
-#### Using an OpenAI-compatible endpoint (e.g. Google Gemini)
+#### Using an OpenAI-compatible endpoint
 
-Some providers (Gemini, Groq, Together, OpenRouter, local vLLM/Ollama, …) expose an
+Some providers (Groq, Together, OpenRouter, local vLLM/Ollama, …) expose an
 **OpenAI-compatible** API. To use one, set the model **and** a base URL in `.env`:
 
 ```env
-MODEL_ID=openai/gemini-2.5-flash
+MODEL_ID=openai/<model-name>
+MODEL_API_KEY=your_provider_api_key
+MODEL_BASE_URL=https://provider.example.com/v1/
+```
+
+For Gemini, prefer the native LiteLLM provider instead:
+
+```env
+MODEL_ID=gemini/gemini-flash-latest
 MODEL_API_KEY=your_gemini_api_key
-MODEL_BASE_URL=https://generativelanguage.googleapis.com/v1beta/openai/
 ```
 
-**Why the `openai/` prefix matters (the trick).** CrewAI inspects the model string
-and, for a recognized provider prefix like `gemini/…`, tries to load that provider's
-**native SDK** — which fails unless you install the extra:
-
-```
-ImportError: Google Gen AI native provider not available, to install: uv add "crewai[google-genai]"
-```
-
-Do **not** install the native extra. This project routes every LLM call through
-**LiteLLM** (see [`utils/llm_factory.py`](src/stockresearch/utils/llm_factory.py),
-`is_litellm=True`), which is what our Langfuse instrumentation hooks into to capture
-each call and its token usage. The native provider bypasses LiteLLM, so tracing and
-token counts would break.
-
-Prefixing the model with `openai/` and supplying `MODEL_BASE_URL` makes CrewAI treat
-it as a generic OpenAI-compatible model and send it through LiteLLM to your endpoint —
-no native SDK, no code changes, and tracing keeps working. The same pattern works for
-any OpenAI-compatible provider: use `openai/<model-name>` plus that provider's base URL
-and key.
+Using `openai/gemini-...` with Google's OpenAI-compatible endpoint still works, but
+LiteLLM sees it as a generic OpenAI model and does not mark it as function-calling
+capable. CrewAI then falls back to a text/ReAct loop, which makes Langfuse traces
+less detailed. The `gemini/...` model ID keeps calls on LiteLLM while preserving
+Gemini tool-calling metadata for richer delegation and tool spans.
 
 > **Note:** Provider free tiers can be very restrictive (e.g. Gemini `gemini-2.5-flash`
 > free tier allows only ~20 requests/day *per model*). A single crew run makes several
@@ -191,4 +188,3 @@ This project includes several versions of the crew to demonstrate the evolution 
 - **Planning**: `crew_v1_with_planning` adds an explicit planning step before execution, while all other versions act directly on the query.
 - **Specialization**: V2 and V3 introduce a specialized Financial Analyst agent with custom tools for stock data, whereas V1 is a "jack of all trades".
 - **Complexity**: V3 demonstrates **hierarchical process** and **agent delegation**, allowing for more robust handling of diverse user queries.
-
