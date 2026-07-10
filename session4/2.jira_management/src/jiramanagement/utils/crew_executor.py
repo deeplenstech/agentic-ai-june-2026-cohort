@@ -25,47 +25,47 @@ if os.getenv("LANGFUSE_PUBLIC_KEY"):
 
     exporter = OTLPSpanExporter(
         endpoint=f"{langfuse_host}/api/public/otel/v1/traces",
-        headers={"Authorization": f"Basic {auth_header}"},
+        headers={
+            "Authorization": f"Basic {auth_header}",
+            "x-langfuse-ingestion-version": "4"
+        }
     )
     provider = TracerProvider()
     provider.add_span_processor(BatchSpanProcessor(exporter))
     otel_trace.set_tracer_provider(provider)
 
     from openinference.instrumentation.crewai import CrewAIInstrumentor
+    from openinference.instrumentation.litellm import LiteLLMInstrumentor
 
-    # Instrument CrewAI orchestration spans (agents, tasks, crew)
+    # CrewAIInstrumentor wraps crew/agent/task/tool spans; LiteLLMInstrumentor
+    # captures every LLM call (with token usage). Because get_llm() sets
+    # is_litellm=True, all calls flow through litellm.completion, so the LiteLLM
+    # spans nest correctly under the active agent span.
     CrewAIInstrumentor().instrument()
-
-    from .llm_otel_listener import LLMOtelListener
-
-    # Subscribe to CrewAI's event bus to create OTEL spans for LLM calls.
-    # CrewAI 0.186+ uses provider-native SDKs (e.g. AnthropicCompletion) and
-    # bypasses litellm entirely, so litellm instrumentation has no effect.
-    # The event bus is the only reliable hook into LLM calls at this version.
-    LLMOtelListener()
+    LiteLLMInstrumentor().instrument()
 
 
-def execute_crew(crew):
+async def execute_crew(crew):
     tracer = otel_trace.get_tracer("jira_management")
 
     console = Console()
     console.print(
-        "[bold magenta]Welcome to the Jira Management. [/bold magenta]\n"
+        "[bold magenta]Welcome to the Jira Management Agent. [/bold magenta]\n"
     )
-    jira_request = console.input("[bold yellow]User:[/bold yellow] ").strip()
-    inputs = {"jira_request": jira_request}
+    user_query = console.input("[bold yellow]User:[/bold yellow] ").strip()
+    inputs = {"jira_request": user_query}
 
-    with tracer.start_as_current_span("jira_management") as span:
+    with tracer.start_as_current_span("jira-management") as span:
         try:
             span.set_attribute("input", str(inputs))
-            response = crew.kickoff(inputs=inputs).raw
+            response = (await crew.kickoff_async(inputs=inputs)).raw
             console.print("\n[bold green]Assitant:[/bold green]")
             console.print(Markdown(response))
             span.set_attribute("output", str(response or ""))
         except Exception as e:
             span.record_exception(e)
             console.print(
-                "\n[bold green]Assitant: An excepption occurred....[/bold green]"
+                "\n[bold green]Assitant: An exception occurred....[/bold green]"
             )
             console.print(Markdown(str(e)))
             raise Exception(f"An error occurred while running the crew: {e}")

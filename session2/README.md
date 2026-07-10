@@ -22,7 +22,7 @@
 
 ## Assignment 1: Stock Research
 
-**Project:** [1.stockresearch/](1.stockresearch/)
+**Project:** [1.stockresearch/](1.stockresearch/README.md)
 
 The stock research project ships three crew configurations. Your assignment is to run all three and compare their behaviour using Langfuse traces.
 
