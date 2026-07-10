@@ -17,7 +17,7 @@ generalist_agent = Agent(
 user_query_task = Task(
     description="{user_query}",
     expected_output="",
-    agent=generalist_agent
+    agent=generalist_agent,
 )
 
 crew = Crew(
