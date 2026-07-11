@@ -45,7 +45,7 @@ if os.getenv("LANGFUSE_PUBLIC_KEY"):
     LiteLLMInstrumentor().instrument()
 
 
-async def execute_crew(crew):
+def execute_crew(crew):
     tracer = otel_trace.get_tracer("jira_management")
 
     console = Console()
@@ -58,7 +58,7 @@ async def execute_crew(crew):
     with tracer.start_as_current_span("jira-management") as span:
         try:
             span.set_attribute("input", str(inputs))
-            response = (await crew.kickoff_async(inputs=inputs)).raw
+            response = crew.kickoff(inputs=inputs).raw
             console.print("\n[bold green]Assitant:[/bold green]")
             console.print(Markdown(response))
             span.set_attribute("output", str(response or ""))

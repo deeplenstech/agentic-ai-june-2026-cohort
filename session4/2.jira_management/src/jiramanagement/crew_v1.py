@@ -1,4 +1,3 @@
-import asyncio
 import base64
 import os
 
@@ -51,9 +50,9 @@ def create_crew():
     )
 
 
-async def run():
-    await execute_crew(create_crew())
+def run():
+    execute_crew(create_crew())
 
 
 if __name__ == "__main__":
-    asyncio.run(run())
+    run()
