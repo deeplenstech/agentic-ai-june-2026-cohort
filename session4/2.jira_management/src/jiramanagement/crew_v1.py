@@ -3,7 +3,8 @@ import base64
 import os
 
 from .utils.crew_executor import execute_crew
-from crewai import Agent, Crew, Task, LLM, Process
+from .utils.llm_factory import get_llm
+from crewai import Agent, Crew, Task, Process
 from crewai_tools import MCPServerAdapter
 
 def create_crew():
@@ -19,13 +20,13 @@ def create_crew():
     }
 
     all_tools = MCPServerAdapter(server_params).tools
-    llm = LLM(model=os.environ["MODEL_ID"])
+    llm = get_llm()
 
     atlassian_agent = Agent(
         role="Atlassian Assistant",
         goal="Complete any Jira and Confluence task using the available Atlassian tools.",
         backstory=(
-            "You are a generalist Atlassian assistant with full access to Jira and Confluence. "
+            "You are a generalist Atlassian assistant for Jira and Confluence. "
             "You read, create, update, and manage issues, pages, and spaces as needed."
         ),
         llm=llm,

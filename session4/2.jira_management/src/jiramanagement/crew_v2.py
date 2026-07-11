@@ -3,7 +3,8 @@ import base64
 import os
 
 from .utils.crew_executor import execute_crew
-from crewai import Agent, Crew, Task, LLM, Process
+from .utils.llm_factory import get_llm
+from crewai import Agent, Crew, Task, Process
 from crewai_tools import MCPServerAdapter
 
 def _filter_tools(all_tools, tool_names: set):
@@ -21,7 +22,7 @@ def create_crew():
     }
 
     all_tools = MCPServerAdapter(server_params).tools
-    llm = LLM(model=os.environ["MODEL_ID"])
+    llm = get_llm()
 
     confluence_reader = Agent(
         role="Confluence Reader",
@@ -145,8 +146,8 @@ def create_crew():
             "task or question (a clear and specific request), and context (all background info the "
             "coworker needs to complete the request, such as URLs, issue IDs, and project keys)."
         ),
-        llm=llm, 
-        # LLM(model=os.environ["LARGE_MODEL_ID"]),
+        llm=llm,
+        # get_llm(model_env="LARGE_MODEL_ID"),
         allow_delegation=True,
     )
 
