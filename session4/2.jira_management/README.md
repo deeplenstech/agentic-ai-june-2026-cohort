@@ -49,7 +49,8 @@ pip install uv
 Install the dependencies:
 
 ```bash
-uv sync
+uv python pin 3.12
+uv --no-config sync
 ```
 
 ### Configuring Environment Variables
@@ -62,13 +63,43 @@ cp .env.template .env
 
 Configure the following keys in your `.env` file:
 
-**Model** — the Bedrock model used by the Jira Project Manager agent:
+**Model setup** — set `MODEL_ID` to the model you want to use, and provide the corresponding API key. Every agent (including the V2 manager) uses this single model. The model must support **tool calling**, since the crew drives the Atlassian MCP tools.
 
 ```env
-MODEL_ID=bedrock/us.anthropic.claude-haiku-4-5-20251001-v1:0
+# Example: OpenAI
+MODEL_ID=openai/gpt-5.4-mini
+MODEL_API_KEY=your_openai_api_key
+
+# Example: Anthropic
+MODEL_ID=anthropic/claude-sonnet-4-6
+MODEL_API_KEY=your_anthropic_api_key
+
+# Example: Gemini through LiteLLM
+MODEL_ID=gemini/gemini-flash-latest
+MODEL_API_KEY=your_gemini_api_key
 ```
 
-Your AWS credentials must be configured (via `~/.aws/credentials`, IAM role, or environment variables) with permissions to invoke the Bedrock model.
+#### Using an OpenAI-compatible endpoint
+
+Some providers (Groq, Together, OpenRouter, local vLLM/Ollama, Bedrock's OpenAI-compatible gateway, …) expose an **OpenAI-compatible** API. To use one, set the model **and** a base URL in `.env`:
+
+```env
+MODEL_ID=openai/<model-name>
+MODEL_API_KEY=your_provider_api_key
+MODEL_BASE_URL=https://provider.example.com/v1/
+```
+
+> **Note:** The native `bedrock/...` provider does **not** work with this crew — its tool-calling path is incompatible with the Atlassian MCP tools.
+
+For Gemini, prefer the native LiteLLM provider instead:
+
+```env
+MODEL_ID=gemini/gemini-flash-latest
+MODEL_API_KEY=your_gemini_api_key
+# Leave MODEL_BASE_URL unset for gemini/...
+```
+
+Using `openai/gemini-...` with Google's OpenAI-compatible endpoint still works, but LiteLLM sees it as a generic OpenAI model and does not mark it as function-calling capable. CrewAI then falls back to a text/ReAct loop, which makes Langfuse traces less detailed. The `gemini/...` model ID keeps calls on LiteLLM while preserving Gemini tool-calling metadata for richer delegation and tool spans.
 
 **Atlassian** — used to authenticate with the Atlassian MCP server:
 

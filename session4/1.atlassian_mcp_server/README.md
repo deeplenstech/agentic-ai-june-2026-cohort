@@ -30,47 +30,27 @@ Before building agents that use this server, it is worth inspecting the server d
 
 ---
 
-## Why a Proxy is Required
-
-MCP Inspector runs in your browser. When the browser tries to connect directly to `https://mcp.atlassian.com/v1/mcp`, the request is blocked by **CORS** (Cross-Origin Resource Sharing) — the remote server does not allow direct browser-to-server connections from a `localhost` origin.
-
-MCP Inspector solves this by shipping a built-in **proxy server**. 
-
----
-
 ## Step 1 — Install MCP Inspector
 
 MCP Inspector is a browser-based UI for connecting to any MCP server and invoking its tools interactively.
 
 ```bash
-npx @modelcontextprotocol/inspector --proxy https://mcp.atlassian.com
+npx @modelcontextprotocol/inspector
 ```
 
-This starts **two** local servers:
-
-| Server | Default port | Purpose |
-|---|---|---|
-| Web UI | `6274` | Browser interface |
-| Proxy | `6277` | Forwards requests to the remote MCP server |
+This starts the Inspector and opens the web UI on port `6274`.
 
 Open `http://localhost:6274` in your browser.
 
 ---
 
-## Step 2 — Connect to the Atlassian MCP Server via the Proxy
+## Step 2 — Connect to the Atlassian MCP Server
 
-In the Inspector UI, look for the **Proxy Server** field (above the transport/URL fields) and confirm it points to:
-
-```
-http://localhost:6277
-```
-
-This is set automatically — leave it as-is. Then configure the target server:
+In the Inspector UI, configure the target server:
 
 1. Set **Transport** to `Streamable HTTP`
 2. Set **URL** to `https://mcp.atlassian.com/v1/mcp`
-3. Set **Connection Type** as `Via Proxy`
-4. Open the **Headers** section and add:
+3. Open the **Headers** section and add:
 
 | Key | Value |
 |---|---|
@@ -84,7 +64,7 @@ echo -n "you@example.com:YOUR_API_TOKEN" | base64
 
 Paste the output as the value for the `Authorization` header.
 
-5. Click **Connect**
+4. Click **Connect**
 
 ---
 
