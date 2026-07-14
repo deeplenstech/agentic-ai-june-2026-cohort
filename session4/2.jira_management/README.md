@@ -15,9 +15,9 @@ A **Jira Project Manager** orchestrates four specialist agents, each scoped to o
 | Agent | Responsibility |
 |---|---|
 | Confluence Reader | Reads pages, spaces, and search results |
-| Confluence Manager | Creates and updates pages, adds comments |
-| Jira Issue Reader | Queries issues and projects via JQL |
-| Jira Issue Manager | Creates, updates, links, and transitions issues |
+| Confluence Writer | Creates and updates pages, adds comments |
+| Jira Reader | Queries issues and projects via JQL |
+| Jira Writer | Creates, updates, links, and transitions issues |
 
 > **Why scope tools per agent?** This is the [Principle of Least Privilege](https://arxiv.org/pdf/2512.11147) applied to agentic AI — each agent gets exactly what its role requires, nothing more.
 >

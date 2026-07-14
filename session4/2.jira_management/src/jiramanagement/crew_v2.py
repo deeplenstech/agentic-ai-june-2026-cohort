@@ -46,8 +46,8 @@ def create_crew():
         allow_delegation=False,
     )
 
-    confluence_manager = Agent(
-        role="Confluence Manager",
+    confluence_writer = Agent(
+        role="Confluence Writer",
         goal="Create and update Confluence pages and add comments to existing pages.",
         backstory=(
             "You are a specialist in writing and maintaining Confluence content. You create new pages "
@@ -68,8 +68,8 @@ def create_crew():
         allow_delegation=False,
     )
 
-    jira_issue_reader = Agent(
-        role="Jira Issue Reader",
+    jira_reader = Agent(
+        role="Jira Reader",
         goal="Read and search Jira issues to retrieve their details, fields, and relationships.",
         backstory=(
             "You are an expert at querying Jira issues and performing JQL searches to find "
@@ -88,8 +88,8 @@ def create_crew():
         allow_delegation=False,
     )
 
-    jira_issue_manager = Agent(
-        role="Jira Issue Manager",
+    jira_writer = Agent(
+        role="Jira Writer",
         goal=(
             "Create, update, and cancel Jira issues including epics, stories, tasks, and sub-tasks "
             "with correct fields, dependency links, status transitions, comments, and worklogs."
@@ -137,16 +137,15 @@ def create_crew():
             "updating, and cancelling work to the appropriate specialised sub-agents.\n\n"
             "Available coworkers (use the exact role name when delegating):\n"
             "- 'Confluence Reader': reads Confluence pages, spaces, and search results\n"
-            "- 'Confluence Manager': creates new Confluence pages, updates existing pages, and adds comments\n"
-            "- 'Jira Issue Reader': reads and searches Jira issues via JQL\n"
-            "- 'Jira Issue Manager': creates, updates, and cancels epics, stories, tasks, sub-tasks, and issue links\n\n"
+            "- 'Confluence Writer': creates new Confluence pages, updates existing pages, and adds comments\n"
+            "- 'Jira Reader': reads and searches Jira issues via JQL\n"
+            "- 'Jira Writer': creates, updates, and cancels epics, stories, tasks, sub-tasks, and issue links\n\n"
             "When using the 'Delegate work to coworker' or 'Ask question to coworker' tools you MUST "
             "always provide all three required arguments: coworker (exact role name from the list above), "
             "task or question (a clear and specific request), and context (all background info the "
             "coworker needs to complete the request, such as URLs, issue IDs, and project keys)."
         ),
-        llm=llm,
-        # get_llm(model_env="LARGE_MODEL_ID"),
+        llm=get_llm(model_env="LARGE_MODEL_ID"),
         allow_delegation=True,
     )
 
@@ -171,7 +170,7 @@ def create_crew():
     )
 
     return Crew(
-        agents=[confluence_reader, confluence_manager, jira_issue_reader, jira_issue_manager],
+        agents=[confluence_reader, confluence_writer, jira_reader, jira_writer],
         tasks=[jira_task],
         manager_agent=project_manager,
         process=Process.hierarchical,
