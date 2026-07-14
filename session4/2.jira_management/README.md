@@ -136,13 +136,16 @@ User: <type your Jira/Confluence request here>
 Example request:
 
 ```
-I have a todo app. Based on the requirements confluence page create one epic in 
-the project with the ID 'TIME' in the cloud ID: 'https://deeplenstech.atlassian.net'. 
-Also create tasks with the parent as the newly created epic and set task dependencies 
-after the tasks have been created. 
-Epic requirements confluence page:
+I have a todo app. Epics and tasks for that app are managed in the Jira project with ID 'TIME'. 
+Alassian Cloud ID is deeplenstech. 
+I have captured requirements and design of a new epic in the confluence page: 
 'https://deeplenstech.atlassian.net/wiki/spaces/.../pages/360449/Reminder+feature+in+my+ToDo+app'. 
-After you are done, update the confluence page and add a table of newly created Jira issues. 
+Can you go through this confluence page, and create epic. Once epic is created, 
+create tasks in that epic based on the details provided in the confluence page. 
+Also ensure that dependencies between tasks are captured. 
+After you are done with creation of all epics and tasks,
+update the confluence page and add a table of newly created Jira epic and its tasks.
+Please ensure to add the link to the Jira epic and tasks along with the link to its dependencies. 
 ```
 
 ## Running the Project
