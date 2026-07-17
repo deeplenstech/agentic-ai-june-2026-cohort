@@ -6,9 +6,9 @@ authors = [{ name = "Your Name", email = "you@example.com" }]
 requires-python = ">=3.12,<3.13"
 dependencies = [
     "boto3",
-    "crewai[anthropic,tools]>=0.130.0",
+    "crewai[anthropic,mcp,tools]",
     "langfuse>=3.5.0",
-    "openinference-instrumentation-crewai>=0.1.13",
+    "openinference-instrumentation-crewai",
     "openinference-instrumentation-litellm",
     "opentelemetry-exporter-otlp-proto-http",
     "openlit",
@@ -17,6 +17,8 @@ dependencies = [
     "opentelemetry-api",
     "opentelemetry-exporter-otlp",
     "opentelemetry-sdk",
+    "mcp",
+    "crewai-tools[mcp]"
 ]
 
 [project.scripts]
