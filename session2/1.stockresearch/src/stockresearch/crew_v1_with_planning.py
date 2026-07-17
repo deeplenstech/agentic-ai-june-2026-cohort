@@ -8,14 +8,16 @@ from .tools.date_tool import GetCurrentDateTool
 
 generalist_agent = Agent(
     role="Generalist Agent",
-    goal="Answer general questions based on user query",
+    goal="Answer general questions based on user query. You must use Tavily search to get latest data.",
     backstory="",
     llm=get_llm(temperature=0.0),
     tools=[GetCurrentDateTool(), TavilySearchTool()],
 )
 
 user_query_task = Task(
-    description="{user_query}", expected_output="", agent=generalist_agent
+    description="{user_query}",
+    expected_output="",
+    agent=generalist_agent,
 )
 
 crew = Crew(

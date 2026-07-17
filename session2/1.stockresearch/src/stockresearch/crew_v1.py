@@ -15,13 +15,16 @@ generalist_agent = Agent(
 )
 
 user_query_task = Task(
-    description="{user_query}", 
-    expected_output="", 
+    description="{user_query}",
+    expected_output="",
     agent=generalist_agent
 )
 
-crew = Crew(agents=[generalist_agent], tasks=[user_query_task], verbose=True)
-
+crew = Crew(
+    agents=[generalist_agent],
+    tasks=[user_query_task],
+    verbose=True,
+)
 
 def run():
     execute_crew(crew)

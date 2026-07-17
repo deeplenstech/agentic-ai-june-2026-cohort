@@ -29,7 +29,11 @@ user_query_task = Task(
     agent=stock_research_agent,
 )
 
-crew = Crew(agents=[stock_research_agent], tasks=[user_query_task], verbose=True)
+crew = Crew(
+    agents=[stock_research_agent],
+    tasks=[user_query_task],
+    verbose=True,
+)
 
 def run():
     execute_crew(crew)
