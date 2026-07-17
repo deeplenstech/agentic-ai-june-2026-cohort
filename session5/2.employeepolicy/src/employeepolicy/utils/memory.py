@@ -14,7 +14,7 @@ class MemoryUtils:
 
     def saveMemory(self, userPrompt:str, assistantResponse:str):
         memoryId = os.getenv("MEMORY_ID")
-        if memoryId is None or memoryId is "":
+        if memoryId is None or memoryId == "":
             return
 
         userPrompt = userPrompt[:9000]
@@ -33,9 +33,9 @@ class MemoryUtils:
         }
         MemoryClient().create_event(**params)
 
-    def loadShortTermMemory(self, count:int=10):
+    def loadShortTermMemory(self, count:int=5):
         memoryId = os.getenv("MEMORY_ID")
-        if memoryId is None or memoryId is "":
+        if memoryId is None or memoryId == "":
             return
 
         params = {
@@ -55,5 +55,36 @@ class MemoryUtils:
                 }
             )
         return response
+
+    def extractSummary(self, query:str="Conversation Summary"):
+        memoryId = os.getenv("MEMORY_ID")
+        if memoryId is None or memoryId == "":
+            return
+
+        memoryStrategyId = os.getenv("MEMORY_SUMMARY_STRATEGY_ID")
+        if memoryStrategyId is None or memoryStrategyId == "":
+            return
+
+        namespace = "/strategies/{memoryStrategyId}/actors/{actorId}/sessions/{sessionId}".format(memoryStrategyId=memoryStrategyId, actorId=self.actorId, sessionId=self.sessionId)
+        params = {
+            "memory_id": memoryId,
+            "namespace": namespace,
+            "query": query,
+            "actor_id": self.actorId
+        }
+        memory_records = MemoryClient().retrieve_memories(**params)
+        
+        summary:List[str] = []
+        for item in memory_records:
+            if item['content'] and item['content']['text']:
+                summary.append(item['content']['text'].replace("\n", " "))
+        responseStr = "\n".join(summary)
+        if responseStr == "":
+            return
+
+        return {
+            "role": "user",
+            "content":  "Summary of Conversation So Far: " + responseStr
+        }
 
         

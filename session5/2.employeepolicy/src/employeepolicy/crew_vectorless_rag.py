@@ -47,7 +47,7 @@ def create_crew():
     return Crew(
         agents=[hr_manager],
         tasks=[handbook_query_task],
-        verbose=True
+        verbose=False
     )
 
 

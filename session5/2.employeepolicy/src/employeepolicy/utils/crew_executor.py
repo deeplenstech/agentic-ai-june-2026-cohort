@@ -10,10 +10,7 @@ from opentelemetry.sdk.trace import TracerProvider
 from opentelemetry.sdk.trace.export import BatchSpanProcessor
 from rich.console import Console
 from rich.markdown import Markdown
-from .memory import MemoryUtils
-from .session import Session
 import uuid
-from .llm_hooks import LLMHooks
 
 load_dotenv()
 warnings.filterwarnings("ignore", category=SyntaxWarning, module="pysbd")
@@ -47,6 +44,16 @@ if os.getenv("LANGFUSE_PUBLIC_KEY"):
     # spans nest correctly under the active agent span.
     CrewAIInstrumentor().instrument()
     LiteLLMInstrumentor().instrument()
+
+
+# Imported after the OTEL setup above: .memory pulls in bedrock_agentcore, which
+# installs its own global TracerProvider on import. Setting our Langfuse provider
+# first means bedrock's later call is the one OTEL refuses ("Overriding of current
+# TracerProvider is not allowed"), so our exporter stays active and traces reach
+# Langfuse.
+from .memory import MemoryUtils
+from .session import Session
+from .llm_hooks import LLMHooks
 
 
 def execute_crew(crew):
