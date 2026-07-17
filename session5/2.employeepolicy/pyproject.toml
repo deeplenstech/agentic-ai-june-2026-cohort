@@ -18,7 +18,8 @@ dependencies = [
     "opentelemetry-exporter-otlp",
     "opentelemetry-sdk",
     "mcp",
-    "crewai-tools[mcp]"
+    "crewai-tools[mcp]",
+    "fastapi>=0.139.2",
 ]
 
 [project.scripts]
