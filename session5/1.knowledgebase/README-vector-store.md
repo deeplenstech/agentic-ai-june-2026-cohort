@@ -182,5 +182,4 @@ After making changes, re-sync the data source and re-run the evaluation to compa
 - [ ] **Test retrieval** from the knowledge base UI
 - [ ] **Test retrieval + generation** with a foundation model
 - [ ] Run a **Bedrock evaluation job** using `eval_data_set.jsonl`
-- [ ] Enable both retrieval and generation metrics
 - [ ] Review scores and iterate on the knowledge base if needed

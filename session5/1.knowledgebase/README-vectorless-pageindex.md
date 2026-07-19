@@ -25,7 +25,7 @@ In this assignment you will upload the same `employee_handbook.pdf` to PageIndex
 
 ## Prerequisites
 
-- A **PageIndex account** — sign up at [pageindex.ai](https://pageindex.ai) or [chat.pageindex.ai](https://chat.pageindex.ai). The free tier covers ~1000 pages.
+- A **PageIndex account** — sign up at [pageindex.ai](https://pageindex.ai) or [dash.pageindex.ai](https://dash.pageindex.ai/documents). The free tier covers ~200 pages.
 - A **PageIndex API key** — create one in the [Developer Dashboard](https://dash.pageindex.ai/api-keys). Copy it immediately.
 - **Node.js** installed (`node -v` to confirm) — required for MCP Inspector.
 
@@ -35,7 +35,7 @@ In this assignment you will upload the same `employee_handbook.pdf` to PageIndex
 
 Uploading is done through the PageIndex web app, **not** over MCP (the MCP server is read-only search/retrieval).
 
-1. Sign in to the PageIndex web app ([pageindex.ai](https://pageindex.ai) / [chat.pageindex.ai](https://chat.pageindex.ai)).
+1. Sign in to the PageIndex web app ([pageindex.ai](https://pageindex.ai) / [dash.pageindex.ai](https://dash.pageindex.ai/documents)).
 2. Upload `employee_handbook.pdf` from this folder.
 3. Wait for processing to reach **completed** — PageIndex parses the PDF and builds its hierarchical tree index. (Processing takes roughly a couple of seconds per page.)
 
@@ -144,5 +144,3 @@ PageIndex has **no built-in RAG evaluation harness** equivalent to Bedrock's, an
 | Tree navigation vs chunking | PageIndex retrieves by walking a document outline, not by splitting text into fixed chunks |
 | Reasoning vs similarity | Retrieval is a multi-step tree search, not a top-K vector similarity lookup |
 | Explainability | The browse → structure → page-content path is a traceable reasoning trajectory |
-| Separation of concerns | Upload happens in the UI; the MCP server is read-only retrieval |
-| MCP tool schemas | Each tool exposes a typed input schema — the same contract an agent framework calls |
