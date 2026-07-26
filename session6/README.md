@@ -36,3 +36,6 @@ The deliverable of this assignment is a **design document** — a written or dia
 ### Submission
 
 Submission is **optional**. If you would like feedback, send your design document to the instructor and cohort over WhatsApp. There is no prescribed format — a Miro board, a Google Doc, a markdown file, or a hand-drawn diagram all work equally well as long as the architecture is clearly communicated.
+
+> To raise the bar, you may even implement the design and share the code repo with the cohort.
+
