@@ -4,12 +4,14 @@
 
 ## Architecture Design
 
-During the group activity in this session, your group worked through one of three problem statements together. For this assignment, you can:
+During the group activity in this session, your group worked through one of three problem statements together. If you couldn't join the session, you may pick the problem statement for project 3 (please see the projects list below).
 
-- **Refine your group activity design** — take the architecture your group sketched out and develop it further on your own, or
-- **Pick a different problem statement** — choose one of the other projects from the list below and design an architecture for it from scratch.
+For this assignment, you can choose either of the below options:
 
-You are not expected to build it. The deliverable is a **design document** — a written or diagrammatic description of your architecture.
+- **Refine your group activity design (recommended)** — take the architecture your group sketched out and develop it further on your own, OR
+- **Pick a different problem statement** — choose one of the other projects from the list below and design an architecture for it from scratch on your own.
+
+The deliverable of this assignment is a **design document** — a written or diagrammatic description of your architecture.
 
 > To raise the bar, you may even implement the design and share code repo with the cohort, or even wider audience on LinkedIn or other platforms.
 
