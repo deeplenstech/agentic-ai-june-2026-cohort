@@ -2,27 +2,65 @@
 import base64
 import os
 import warnings
+
 from dotenv import load_dotenv
+from opentelemetry import trace as otel_trace
+from opentelemetry.exporter.otlp.proto.http.trace_exporter import OTLPSpanExporter
+from opentelemetry.sdk.trace import TracerProvider
+from opentelemetry.sdk.trace.export import BatchSpanProcessor
+from rich.console import Console
+from rich.markdown import Markdown
+import uuid
 
 load_dotenv()
 warnings.filterwarnings("ignore", category=SyntaxWarning, module="pysbd")
 
-from rich.console import Console
-from rich.markdown import Markdown
-import uuid
-import re
-from deepeval.integrations.crewai import instrument_crewai
-from deepeval.tracing import trace, update_current_trace
+if os.getenv("LANGFUSE_PUBLIC_KEY"):
+    # Set up OTEL -> Langfuse exporter BEFORE crewai imports
+    langfuse_public_key = os.environ["LANGFUSE_PUBLIC_KEY"]
+    langfuse_secret_key = os.environ["LANGFUSE_SECRET_KEY"]
+    langfuse_host = os.environ.get("LANGFUSE_BASE_URL", "https://cloud.langfuse.com")
+    auth_header = base64.b64encode(
+        f"{langfuse_public_key}:{langfuse_secret_key}".encode()
+    ).decode()
 
-instrument_crewai()
+    exporter = OTLPSpanExporter(
+        endpoint=f"{langfuse_host}/api/public/otel/v1/traces",
+        headers={
+            "Authorization": f"Basic {auth_header}",
+            "x-langfuse-ingestion-version": "4"
+        }
+    )
+    provider = TracerProvider()
+    provider.add_span_processor(BatchSpanProcessor(exporter))
+    otel_trace.set_tracer_provider(provider)
+
+    from openinference.instrumentation.crewai import CrewAIInstrumentor
+    from openinference.instrumentation.litellm import LiteLLMInstrumentor
+
+    # CrewAIInstrumentor wraps crew/agent/task/tool spans; LiteLLMInstrumentor
+    # captures every LLM call (with token usage). Because get_llm() sets
+    # is_litellm=True, all calls flow through litellm.completion, so the LiteLLM
+    # spans nest correctly under the active agent span.
+    CrewAIInstrumentor().instrument()
+    LiteLLMInstrumentor().instrument()
+
+
+# Imported after the OTEL setup above: .memory pulls in bedrock_agentcore, which
+# installs its own global TracerProvider on import. Setting our Langfuse provider
+# first means bedrock's later call is the one OTEL refuses ("Overriding of current
+# TracerProvider is not allowed"), so our exporter stays active and traces reach
+# Langfuse.
+from .memory import MemoryUtils
+from .session import Session
+from .llm_hooks import LLMHooks
+import re
 
 EMPLOYEE_ID_PATTERN = re.compile(
     r"[a-zA-Z0-9][a-zA-Z0-9-_/]*(?::[a-zA-Z0-9-_/]+)*[a-zA-Z0-9-_/]*"
 )
 
-from .memory import MemoryUtils
-from .session import Session
-from .llm_hooks import LLMHooks
+from langfuse import propagate_attributes
 
 def execute_crew(crew):
     console = Console()
@@ -37,32 +75,33 @@ def execute_crew(crew):
     memoryUtils = MemoryUtils(sessionId=session_id, actorId=employee_id)
     LLMHooks(memoryUtils).register()
 
+    tracer = otel_trace.get_tracer("employee_policy")
     while True:
         user_query = console.input("[bold yellow]User:[/bold yellow] ").strip()
+        inputs = {
+            "employee_id": employee_id,
+            "employee_query": user_query
+        }
         if user_query.strip().lower() == 'bye':
             console.print("[bold green]Chatbot:[/bold green] Goodbye!")
             break
 
-        try:
-            trace_kwargs = {
-                "thread_id": session_id,
-                "user_id": employee_id,
-                "input": user_query,
-                "name": "Employee Chatbot Interaction"
-            }
-            with trace(**trace_kwargs):
-                inputs = {
-                    'employee_query': user_query,
-                    'employee_id': employee_id
-                }
-                response = crew.kickoff(inputs=inputs).raw
-                console.print("\n[bold green]Assitant:[/bold green]")
-                console.print(Markdown(response))
-                update_current_trace(output=response)
-                memoryUtils.saveMemory(userPrompt=user_query, assistantResponse=response)
-        except Exception as e:
-            console.print(
-                "\n[bold green]Assitant: An exception occurred....[/bold green]"
-            )
-            console.print(Markdown(str(e)))
+        with propagate_attributes(session_id=session_id):
+            with tracer.start_as_current_span("employee_policy") as span:
+                try:
+                    span.set_attribute("input", str(inputs))
+                    response = crew.kickoff(inputs=inputs).raw
+                    console.print("\n[bold green]Assitant:[/bold green]")
+                    console.print(Markdown(response))
+                    span.set_attribute("output", str(response or ""))
+                    memoryUtils.saveMemory(userPrompt=user_query, assistantResponse=response)
 
+                except Exception as e:
+                    span.record_exception(e)
+                    console.print(
+                        "\n[bold green]Assitant: An exception occurred....[/bold green]"
+                    )
+                    console.print(Markdown(str(e)))
+                    raise Exception(f"An error occurred while running the crew: {e}")
+                finally:
+                    provider.force_flush()
