@@ -1,13 +1,9 @@
 #!/usr/bin/env python
-import base64
 import os
 import warnings
+from contextlib import contextmanager
 
 from dotenv import load_dotenv
-from opentelemetry import trace as otel_trace
-from opentelemetry.exporter.otlp.proto.http.trace_exporter import OTLPSpanExporter
-from opentelemetry.sdk.trace import TracerProvider
-from opentelemetry.sdk.trace.export import BatchSpanProcessor
 from rich.console import Console
 from rich.markdown import Markdown
 import uuid
@@ -15,25 +11,21 @@ import uuid
 load_dotenv()
 warnings.filterwarnings("ignore", category=SyntaxWarning, module="pysbd")
 
-if os.getenv("LANGFUSE_PUBLIC_KEY"):
-    # Set up OTEL -> Langfuse exporter BEFORE crewai imports
-    langfuse_public_key = os.environ["LANGFUSE_PUBLIC_KEY"]
-    langfuse_secret_key = os.environ["LANGFUSE_SECRET_KEY"]
-    langfuse_host = os.environ.get("LANGFUSE_BASE_URL", "https://cloud.langfuse.com")
-    auth_header = base64.b64encode(
-        f"{langfuse_public_key}:{langfuse_secret_key}".encode()
-    ).decode()
+TRACE_NAME = "employee-chatbot-turn"
 
-    exporter = OTLPSpanExporter(
-        endpoint=f"{langfuse_host}/api/public/otel/v1/traces",
-        headers={
-            "Authorization": f"Basic {auth_header}",
-            "x-langfuse-ingestion-version": "4"
-        }
-    )
-    provider = TracerProvider()
-    provider.add_span_processor(BatchSpanProcessor(exporter))
-    otel_trace.set_tracer_provider(provider)
+langfuse = None
+propagate_attributes = None
+
+if os.getenv("LANGFUSE_PUBLIC_KEY"):
+    # Set up Langfuse BEFORE crewai imports.
+    # get_client() reads LANGFUSE_PUBLIC_KEY, LANGFUSE_SECRET_KEY and LANGFUSE_BASE_URL, then
+    # installs LangfuseSpanProcessor on the global tracer provider. That processor is what
+    # stamps propagate_attributes() values (session id, user id) onto every span, including
+    # the CrewAI and LiteLLM spans created by the instrumentors below. A raw OTLP exporter
+    # cannot do this: nothing would read the propagated values out of the OTEL context.
+    from langfuse import get_client, propagate_attributes
+
+    langfuse = get_client()
 
     from openinference.instrumentation.crewai import CrewAIInstrumentor
     from openinference.instrumentation.litellm import LiteLLMInstrumentor
@@ -46,11 +38,10 @@ if os.getenv("LANGFUSE_PUBLIC_KEY"):
     LiteLLMInstrumentor().instrument()
 
 
-# Imported after the OTEL setup above: .memory pulls in bedrock_agentcore, which
-# installs its own global TracerProvider on import. Setting our Langfuse provider
-# first means bedrock's later call is the one OTEL refuses ("Overriding of current
-# TracerProvider is not allowed"), so our exporter stays active and traces reach
-# Langfuse.
+# Imported after the Langfuse setup above: .memory pulls in bedrock_agentcore, which
+# installs its own global TracerProvider on import. get_client() registers the Langfuse
+# provider first, so bedrock's later call is the one OTEL refuses ("Overriding of current
+# TracerProvider is not allowed") and our span processor stays active.
 from .memory import MemoryUtils
 from .session import Session
 from .llm_hooks import LLMHooks
@@ -60,7 +51,30 @@ EMPLOYEE_ID_PATTERN = re.compile(
     r"[a-zA-Z0-9][a-zA-Z0-9-_/]*(?::[a-zA-Z0-9-_/]+)*[a-zA-Z0-9-_/]*"
 )
 
-from langfuse import propagate_attributes
+
+@contextmanager
+def trace_turn(session_id, employee_id, inputs):
+    """Root Langfuse observation for one chat turn.
+
+    propagate_attributes() must wrap the root span, not sit inside it. Only the active span
+    and spans created after entering the context receive the attributes, so entering it first
+    is what gets session id and user id onto the nested CrewAI and LiteLLM spans.
+
+    Yields None when Langfuse is not configured, so the chatbot still runs without keys.
+    """
+    if langfuse is None:
+        yield None
+        return
+
+    with propagate_attributes(
+        session_id=session_id,
+        user_id=employee_id,
+        trace_name=TRACE_NAME,
+        tags=["employee-chatbot"],
+    ):
+        with langfuse.start_as_current_observation(name=TRACE_NAME, input=inputs) as span:
+            yield span
+
 
 def execute_crew(crew):
     console = Console()
@@ -71,11 +85,13 @@ def execute_crew(crew):
             break
         console.print("[bold red]Invalid Employee ID. Please try again.[/bold red]")
     Session().setEmployeeId(employee_id)
+
+    # One CLI run is one conversation, so it maps to one Langfuse session. The same id is
+    # already used as the AgentCore memory session.
     session_id = str(uuid.uuid4())
     memoryUtils = MemoryUtils(sessionId=session_id, actorId=employee_id)
     LLMHooks(memoryUtils).register()
 
-    tracer = otel_trace.get_tracer("employee_policy")
     while True:
         user_query = console.input("[bold yellow]User:[/bold yellow] ").strip()
         inputs = {
@@ -86,22 +102,23 @@ def execute_crew(crew):
             console.print("[bold green]Chatbot:[/bold green] Goodbye!")
             break
 
-        with propagate_attributes(session_id=session_id):
-            with tracer.start_as_current_span("employee_policy") as span:
-                try:
-                    span.set_attribute("input", str(inputs))
-                    response = crew.kickoff(inputs=inputs).raw
-                    console.print("\n[bold green]Assitant:[/bold green]")
-                    console.print(Markdown(response))
-                    span.set_attribute("output", str(response or ""))
-                    memoryUtils.saveMemory(userPrompt=user_query, assistantResponse=response)
+        with trace_turn(session_id, employee_id, inputs) as span:
+            try:
+                response = crew.kickoff(inputs=inputs).raw
+                console.print("\n[bold green]Assitant:[/bold green]")
+                console.print(Markdown(response))
+                if span:
+                    span.update(output=response)
+                memoryUtils.saveMemory(userPrompt=user_query, assistantResponse=response)
 
-                except Exception as e:
-                    span.record_exception(e)
-                    console.print(
-                        "\n[bold green]Assitant: An exception occurred....[/bold green]"
-                    )
-                    console.print(Markdown(str(e)))
-                    raise Exception(f"An error occurred while running the crew: {e}")
-                finally:
-                    provider.force_flush()
+            except Exception as e:
+                if span:
+                    span.update(level="ERROR", status_message=str(e))
+                console.print(
+                    "\n[bold green]Assitant: An exception occurred....[/bold green]"
+                )
+                console.print(Markdown(str(e)))
+                raise Exception(f"An error occurred while running the crew: {e}")
+            finally:
+                if langfuse:
+                    langfuse.flush()

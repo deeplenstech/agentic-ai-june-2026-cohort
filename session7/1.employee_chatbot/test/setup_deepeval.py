@@ -44,9 +44,7 @@ def generate_and_push_dataset():
         
         inputs = {
             'employee_query': query,
-            'employee_id': str(uuid.uuid4()),
-            'conversationHistory': "",
-            'conversationSummary': ""
+            'employee_id': str(uuid.uuid4())
         }
         
         try:

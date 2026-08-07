@@ -19,6 +19,7 @@ This project features a simple HR agent capable of:
   - `get_current_date`: Provides the current date for date-relative queries.
 - **Online Evaluation**: Live metrics (e.g., Knowledge Based Completeness) are reported to [Confident AI](https://www.confident-ai.com/) during interaction.
 - **Offline Testing**: Comprehensive test suite for single-turn and multi-turn scenarios using DeepEval's `ConversationSimulator`.
+- **Session-Level Tracing**: Every turn of a run is traced to [Langfuse](https://langfuse.com/) and grouped under one session, attributed to the employee.
 
 ## Installation
 
@@ -49,6 +50,9 @@ cp .env.template .env
 | `BEDROCK_KB_ID` | The ID of your Amazon Bedrock Knowledge Base (setup similarly to Session 3 assignments). |
 | `CONFIDENT_API_KEY` | Your API key from [Confident AI](https://www.confident-ai.com/) (ensure it's for a specific project). |
 | `OPENAI_API_KEY` | Required by DeepEval for running certain metrics (GEval, etc.). |
+| `LANGFUSE_PUBLIC_KEY` | Public key from [Langfuse](https://cloud.langfuse.com). Optional. Tracing is only activated when this is set. |
+| `LANGFUSE_SECRET_KEY` | Secret key from Langfuse. |
+| `LANGFUSE_BASE_URL` | Langfuse host. Defaults to `https://cloud.langfuse.com`. |
 
 > [!NOTE]
 > Ensure your AWS credentials are configured (via `~/.aws/credentials` or environment variables) with permissions for Bedrock and the Knowledge Base.
@@ -145,3 +149,46 @@ Run automated offline tests to validate the chatbot's performance on single-turn
 5.  **Verify Results**:
     - Review the test results in the terminal.
     - Check the **Test Runs** section in Confident AI for detailed breakdowns of metric scores.
+
+---
+
+## Assignment 4: Langfuse Session Tracing
+
+### Goal
+Trace the chatbot to Langfuse and see every turn of a conversation grouped under a single **session**, attributed to the employee who ran it.
+
+### Background
+A single question to the chatbot produces one trace. That trace on its own tells you nothing about the conversation it belonged to. Langfuse **sessions** solve this by grouping related traces under a shared session ID, so you can replay a whole conversation in order.
+
+This project sets that up with `propagate_attributes()` from the Langfuse SDK. It is a context manager that writes trace-level attributes into the OpenTelemetry context. Every span created inside it inherits them. See `src/employee_chatbot/utils/crew_executor.py`.
+
+> [!IMPORTANT]
+> `propagate_attributes()` must wrap the creation of the root span, not sit inside it. Only the currently active span and spans created after entering the context receive the attributes. Entering it too late is what gets the nested CrewAI and LiteLLM spans left out.
+
+Two things make the propagation actually work:
+1. `get_client()` installs Langfuse's own span processor on the global tracer provider. A hand-rolled OTLP exporter does not read propagated values out of the OTEL context, so nothing would be stamped onto spans.
+2. The root span is created via `langfuse.start_as_current_observation()`. Langfuse's span processor drops spans that are neither its own nor from a known LLM instrumentor, so a hand-rolled tracer span would be silently discarded and the trace would be orphaned.
+
+### Steps
+1.  **Get your Langfuse keys**:
+    - Sign up at [cloud.langfuse.com](https://cloud.langfuse.com).
+    - Create an organization, then create a project (e.g. `employee-chatbot`). Each project has its own keys.
+    - Go to **Project Settings → API Keys** and copy the public and secret keys.
+2.  **Configure**: add `LANGFUSE_PUBLIC_KEY`, `LANGFUSE_SECRET_KEY` and `LANGFUSE_BASE_URL` to your `.env`.
+3.  **Run the Langfuse entry point**:
+    ```bash
+    uv run python -m src.employee_chatbot.crew
+    ```
+4.  **Interact**: enter an Employee ID, then send at least three turns in the same run.
+    - Ask a policy question (e.g., "What is the sick leave policy?").
+    - Apply for a leave (e.g., "I want to take leave from 20th May to 22nd May for a vacation").
+    - Ask about your history (e.g., "How many leaves have I taken so far?").
+    - Type `Bye` to exit.
+5.  **Observe** in the Langfuse dashboard:
+    - **Sessions**: one session holding all three turns as separate traces, in order.
+    - **Users**: traces attributed to the Employee ID you entered.
+    - Open a trace and confirm the root span `employee-chatbot-turn` has input and output, with CrewAI agent, task and tool spans plus LiteLLM generation spans (including token usage) nested beneath it.
+    - Click into a nested LiteLLM span and confirm it carries `session.id` and `user.id`. This is the proof that propagation reached the child spans, not just the root.
+6.  **Deep Dive**:
+    - The session ID is a fresh UUID per run, so one CLI run is one conversation. The same ID is reused as the AgentCore memory session.
+    - Try passing `metadata={...}` or extra `tags` to `propagate_attributes()` and filter on them in the dashboard. Metadata values are coerced to strings and capped at 200 characters.
