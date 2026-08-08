@@ -1,0 +1,59 @@
+[
+    {
+        "input": "What is the policy for earned leaves?",
+        "actual_output": null,
+        "expected_output": "Earned Leave (EL), also called Privilege Leave, is paid leave earned at a rate of **one day for every 20 days worked**—approximately **12 days per 240 working days annually**.\n\nYou may carry forward up to **30 days** of unused earned leave into the next year. Leave beyond this limit may be encashed annually or upon separation, subject to company policy. Leave requests should generally be submitted and approved in advance.",
+        "retrieval_context": null,
+        "context": null,
+        "name": null,
+        "comments": null,
+        "source_file": null,
+        "tools_called": null,
+        "expected_tools": [
+            {
+                "name": "bedrock_knowledge_base_retriever_tool"
+            }
+        ],
+        "additional_metadata": null,
+        "custom_column_key_values": null
+    },
+    {
+        "input": "How many leaves have I taken so far?",
+        "actual_output": null,
+        "expected_output": "You have taken **0 days of leave** so far. No leaves have been recorded for you in the last six months.",
+        "retrieval_context": null,
+        "context": null,
+        "name": null,
+        "comments": null,
+        "source_file": null,
+        "tools_called": null,
+        "expected_tools": [
+            {
+                "name": "read_leaves_availed"
+            }
+        ],
+        "additional_metadata": null,
+        "custom_column_key_values": null
+    },
+    {
+        "input": "I want to apply for 2 days of sick leave starting tomorrow.",
+        "actual_output": null,
+        "expected_output": "Your 2 days of sick leave have been successfully applied for August 9–10, 2026. Wishing you a speedy recovery.",
+        "retrieval_context": null,
+        "context": null,
+        "name": null,
+        "comments": null,
+        "source_file": null,
+        "tools_called": null,
+        "expected_tools": [
+            {
+                "name": "get_current_date"
+            },
+            {
+                "name": "insert_requested_leaves"
+            }
+        ],
+        "additional_metadata": null,
+        "custom_column_key_values": null
+    }
+]

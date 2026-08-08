@@ -1,0 +1,13 @@
+[
+    {
+        "scenario": "Manpreet wants to go for a long vacation starting from the first working day of the coming month and wants to apply earned leave for the same. Manpreet's leave is already approved. This multi-turn interaction will be turn by turn. In the first turn, Manpreet wants to first check how many earned leaves are possible in a calendar year. And then in the second turn, Manpreet wants to check how many earned leaves he has taken in this calendar year. And then in the last turn Manpreet wants to apply for remaining possible earned leaves. While applying leaves, Manpreet wants to ignore Saturdays and Sundays before applying leaves. And hence multiple applications of earned leave might need to be submitted.",
+        "turns": null,
+        "expected_outcome": "Maximum earned leaves submitted into the system.",
+        "user_description": "Manpreet is an employee of DeepLens.",
+        "context": null,
+        "name": null,
+        "comments": null,
+        "additional_metadata": null,
+        "custom_column_key_values": null
+    }
+]
