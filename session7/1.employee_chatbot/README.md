@@ -2,7 +2,7 @@
 
 ## Purpose
 
-Welcome to the **Employee Chatbot** project, powered by [crewAI](https://crewai.com) and [DeepEval](https://github.com/confident-ai/deepeval).
+Welcome to the **Employee Chatbot** project, powered by [crewAI](https://crewai.com), [Langfuse](https://langfuse.com/) and [DeepEval](https://github.com/confident-ai/deepeval).
 
 This project features a simple HR agent capable of:
 1.  **Policy Querying**: Answering questions about company policies by searching an **Amazon Bedrock Knowledge Base**.
@@ -17,9 +17,9 @@ This project features a simple HR agent capable of:
   - `insert_leave`: Records new leave requests in the database.
   - `read_leaves`: Retrieves an employee's leave records.
   - `get_current_date`: Provides the current date for date-relative queries.
-- **Online Evaluation**: Live metrics (e.g., Knowledge Based Completeness) are reported to [Confident AI](https://www.confident-ai.com/) during interaction.
-- **Offline Testing**: Comprehensive test suite for single-turn and multi-turn scenarios using DeepEval's `ConversationSimulator`.
 - **Session-Level Tracing**: Every turn of a run is traced to [Langfuse](https://langfuse.com/) and grouped under one session, attributed to the employee.
+- **Online Evaluation**: Those traces can be scored automatically by a Langfuse LLM-as-a-judge evaluator (e.g. Conciseness), with the score attached to the trace.
+- **Offline Evaluation**: Test suite for single-turn and multi-turn scenarios using DeepEval, with goldens stored locally as JSON. Nothing is pushed to a hosted evaluation platform.
 
 ## Installation
 
@@ -42,85 +42,93 @@ Copy the template and fill in your credentials:
 cp .env.template .env
 ```
 
-### Required Environment Variables
+### Environment Variables
 
 | Variable | Description |
 | :--- | :--- |
-| `MODEL_ID` | The Bedrock model ID (e.g., `bedrock/us.anthropic.claude-sonnet-4-6`). |
-| `BEDROCK_KB_ID` | The ID of your Amazon Bedrock Knowledge Base (setup similarly to Session 3 assignments). |
-| `CONFIDENT_API_KEY` | Your API key from [Confident AI](https://www.confident-ai.com/) (ensure it's for a specific project). |
-| `OPENAI_API_KEY` | Required by DeepEval for running certain metrics (GEval, etc.). |
+| `MODEL_ID` | The model ID used by the agent (e.g., `bedrock/us.anthropic.claude-sonnet-4-6`). Required. |
+| `MODEL_API_KEY` | API key for the model provider. Optional. Only needed when the provider is not authenticated another way (e.g., AWS credentials for Bedrock). |
+| `MODEL_BASE_URL` | Base URL for the model provider. Optional. Useful for OpenAI-compatible gateways. |
+| `BEDROCK_KB_ID` | The ID of your Amazon Bedrock Knowledge Base (setup similarly to Session 5 assignments). Required. |
+| `MEMORY_ID` | Amazon Bedrock AgentCore memory ID. Optional. Memory is skipped when empty. Set it up as in the Session 5 assignments. |
+| `MEMORY_SUMMARY_STRATEGY_ID` | AgentCore summary strategy ID. Optional. Summaries are skipped when empty. |
 | `LANGFUSE_PUBLIC_KEY` | Public key from [Langfuse](https://cloud.langfuse.com). Optional. Tracing is only activated when this is set. |
 | `LANGFUSE_SECRET_KEY` | Secret key from Langfuse. |
 | `LANGFUSE_BASE_URL` | Langfuse host. Defaults to `https://cloud.langfuse.com`. |
+| `OPENAI_API_KEY` | Required by DeepEval for the offline test metrics and the conversation simulator. |
 
 > [!NOTE]
 > Ensure your AWS credentials are configured (via `~/.aws/credentials` or environment variables) with permissions for Bedrock and the Knowledge Base.
 
----
+## Running the Chatbot
 
-## Assignment 1: AWS AgentCore Memory Setup
+There is a single entry point:
 
-### Goal
-Configure the chatbot to use **Amazon Bedrock AgentCore** for persistent conversational memory, allowing it to maintain context across sessions via short-term turns and long-term summaries.
+```bash
+cd session7/1.employee_chatbot
+uv run python -m src.employee_chatbot.crew
+```
 
-### Steps
-1.  **AWS Console Setup**:
-    - Navigate to the **Amazon Bedrock AgentCore** console.
-    - Under **Build**, find **Memory**
-    - Create a new **Memory** and note down the `MEMORY_ID`.
-    - Configure a **Memory Strategy** for automated summarization and note down the `MEMORY_SUMMARY_STRATEGY_ID`.
-2.  **Environment Configuration**:
-    - Update your `.env` file with the retrieved IDs:
-      ```env
-      MEMORY_ID="your_memory_id"
-      MEMORY_SUMMARY_STRATEGY_ID="your_memory_summary_strategy_id"
-      ```
-3.  **Verify Memory Persistence**:
-    - Run the chatbot and have a conversation about a specific topic (e.g., your vacation plans). Try to interact multiple times and see if the chatbot remembers the previous messages and provides relevant responses.
-    ```bash
-    uv run python -m src.employee_chatbot.main
-    ```
-    - Exit the chatbot by typing `bye`.
-4.  **Deep Dive**:
-    - Review `src/employee_chatbot/utils/memory.py` to see how `MemoryClient` from `bedrock_agentcore` is used to `create_event`, `get_last_k_turns`, and `retrieve_memories`.
-    - Understand the difference between **Short-term Memory** (exact last $K$ turns) and **Long-term Memory** (summaries extracted via memory strategies).
+You are asked for an Employee ID first, then for queries. Type `Bye` to exit.
 
 ---
 
-## Assignment 2: Online Evaluation
+## Assignment 1: Online Evaluation with Langfuse
 
 ### Goal
-Configure the chatbot, interact with it across multiple turns, and observe the live traces and online evaluations in Confident AI.
+Have an **LLM-as-a-judge evaluator** (e.g. Conciseness) score the chatbot's live traffic in Langfuse automatically, and read the score back on the trace.
+
+### Background
+An evaluator is a judge prompt that Langfuse runs server-side on traces as they arrive. The resulting **score** is attached to the trace it judged. This is online evaluation. It grades real traffic.
+
+The unit of evaluation is one trace, which here is one turn of the conversation. Langfuse groups the turns of a run under a **session** so you can replay the conversation, but sessions cannot be evaluated. Judge the turns.
+
+Nothing in this repo has to change for the assignment. The evaluator reads what `execute_crew()` already records on the root span `employee-chatbot-turn`: the input is the crew inputs dict (`employee_id`, `employee_query`) and the output is the assistant's reply.
 
 ### Steps
-1.  **Setup Environment**: Fill in your `.env` file with all required keys (including the Memory IDs from Assignment 1).
-2.  **Set Up Metric Collections & Evaluation Workflows** (in the Confident AI dashboard):
-    - **Create two metric collections** under **Metrics → Collections** ([Metric Collections docs](https://www.confident-ai.com/docs/metrics/metric-collections)):
-      - A **single-turn** collection (e.g. `Employee Chatbot Trace Metrics`) for evaluating individual traces.
-      - A **multi-turn** collection (e.g. `Employee Chatbot Thread Metrics`) for evaluating whole conversations.
-    - **Add a trace evaluation rule** so each new trace is scored automatically on arrival: go to **Workflows → Traces → Evaluation Rules → New rule**, set the **Data Model** to **Trace**, attach your **single-turn** collection, and toggle it **Enabled**. Trace rules fire at ingest on every incoming trace ([Workflows docs](https://www.confident-ai.com/docs/llm-tracing/workflows#evaluation-rules)).
-    - **Add a thread evaluation rule** so each conversation is scored once it is well-formed: go to **Workflows → Threads → Evaluation Rules → New rule**, attach your **multi-turn** collection, and toggle it **Enabled**. Thread rules fire after the thread has been idle for the configured time limit (default 300s), so evaluation triggers shortly after you type `Bye` ([Workflow docs](https://www.confident-ai.com/docs/llm-tracing/workflows#evaluation-rules)).
-3.  **Run the Chatbot**:
+1.  **Get your Langfuse keys**:
+    - Sign up at [cloud.langfuse.com](https://cloud.langfuse.com).
+    - Create an organization, then create a project (e.g. `employee-chatbot`). Each project has its own keys.
+    - Go to **Project Settings → API Keys** and copy the public and secret keys.
+2.  **Configure**: add `LANGFUSE_PUBLIC_KEY`, `LANGFUSE_SECRET_KEY` and `LANGFUSE_BASE_URL` to your `.env`.
+3.  **Run the chatbot**:
     ```bash
-    uv run python -m src.employee_chatbot.main
+    uv run python -m src.employee_chatbot.crew
     ```
-4.  **Interact**:
+4.  **Interact**: enter an Employee ID, then send couple of turns in the same run.
     - Ask a policy question (e.g., "What is the sick leave policy?").
-    - Apply for a leave (e.g., "I want to take leave from 20th May to 22nd May for a vacation").
+    - Apply for a leave (e.g., "I want to take casual leave from coming Monday for 3 days").
     - Ask about your history (e.g., "How many leaves have I taken so far?").
-    - Type `Bye` to exit and trigger thread-level evaluation.
-5.  **Observe**:
-    - Login to [Confident AI](https://www.confident-ai.com/).
-    - Navigate to the **Project** and view the **Traces** and the **Threads**.
-    - Verify that tool calls are captured and metrics are calculated.
+    - Type `Bye` to exit.
+5.  **Confirm the traces arrived**: in the Langfuse dashboard, open one trace and check that the root span `employee-chatbot-turn` has both an input and an output. That pair is what the judge will read, so an empty one means the evaluator has nothing to score. Ensure the `type` filter on the left has only `SPAN` selected. And `Is Root Observation` has `True` selected.
+6.  **Add a judge model**: go to **Project Settings → LLM Connections** and add a provider key (OpenAI, Anthropic, Azure OpenAI or AWS Bedrock). This provider would be used for `LLM as a judge` in subsequent steps. This Readme was tested with OpenAI. 
+7.  **Create the evaluator**: go to **Evaluation → Evaluators → Set up Evaluator**.
+    - Pick the managed **Conciseness** evaluator from the Langfuse library, or write a custom one with your own prompt, `{{variables}}` and score type (numeric, boolean or categorical).
+    - **Filter**: restrict it to trace name `employee-chatbot-turn`. Also restrict to `Is Root Observation` with value `True`. Without a filter the judge also fires on the nested CrewAI and LiteLLM spans, which costs tokens and scores things you do not care about. 
+    - **Variable mapping**: map the judge's output/generation variable to the trace **Output**. For the query variable, map to the trace **Input** with the JSONPath `$.employee_query`, since the input is the crew inputs dict, not a bare string. Use the live preview to confirm the populated prompt looks right.
+    - **Sampling**: 100% while you are learning. Lower it once you understand the token cost.
+8.  **Generate scored traces**: evaluators run on traces that arrive after they are created, so run the chatbot again and send a few more turns.
+9.  **Read the score back**:
+    - Open one of the new traces and find the **Conciseness** score, with the judge's reasoning as a comment.
+    - Check the **Scores** column in the trace list, and filter the list by that score to find the worst turns.
+10. **Deep Dive**:
+    - Ask the same question twice, once plainly and once with "explain in as much detail as possible", and compare the two Conciseness scores.
+    - Add a second evaluator (e.g. Helpfulness or Toxicity) and see both scores land on the same trace.
+    - Read a low score's reasoning, then decide whether you trust it. An online judge is itself an LLM call, and an unreliable judge produces confident numbers about nothing.
 
 ---
 
-## Assignment 3: DeepEval Offline Tests
+## Assignment 2: Offline Evaluation with DeepEval
 
 ### Goal
-Run automated offline tests to validate the chatbot's performance on single-turn and multi-turn goldens.
+Run automated offline tests to validate the chatbot's performance on single-turn and multi-turn goldens, before a change ships.
+
+### Background
+Where Assignment 1 grades live conversations after the fact, this grades a fixed dataset on demand, so a regression shows up in a test run instead of in production traces.
+
+Goldens live as JSON files under `test/data/`, loaded by `test/utils/goldens.py`. They are checked into the repo. `test/setup_deepeval.py` regenerates them by running the crew and recording its answers plus the tools it called.
+
+The single-turn suite scores each answer on `AnswerRelevancyMetric`, a `Correctness` GEval metric, and `ToolCorrectnessMetric`. The multi-turn suite drives the crew through DeepEval's `ConversationSimulator` and scores the conversation on `TurnRelevancyMetric` and `ConversationCompletenessMetric`.
 
 ### Steps
 
@@ -129,66 +137,26 @@ Run automated offline tests to validate the chatbot's performance on single-turn
       ```bash
       source .venv/bin/activate
       ```
-2.  **Setup Test Cases**:
-    - Before running the tests, make sure the deepeval test cases are setup by running. These would create goldens in Confident AI:
+2.  **(Optional) Regenerate the Goldens**:
+    - The goldens are already committed. Regenerate them only if you changed the agent, the tools or the knowledge base:
       ```bash
       uv run python test/setup_deepeval.py
       ```
+    - This overwrites `test/data/employee_chatbot_goldens.json` and `test/data/employee_chatbot_multi_turn_goldens.json`. The expected outputs become whatever the crew answers on that run, so review the printed baseline responses before trusting them.
 3.  **Single-Turn Tests**:
-    - Ensure you have a golden dataset named `"Employee Chatbot Goldens"` in Confident AI (or modify `test/test_chatbot.py` to match your dataset alias).
-    - Run the tests:
-      ```bash
-      deepeval test run test/test_chatbot.py
-      ```
+    ```bash
+    deepeval test run test/test_chatbot.py
+    ```
 4.  **Multi-Turn Tests**:
-    - Ensure you have a conversational golden dataset named `"Employee Chatbot Multi Turn Goldens"`.
-    - Run the multi-turn simulation tests:
-      ```bash
-      deepeval test run test/test_multi_turn.py
-      ```
+    ```bash
+    deepeval test run test/test_multi_turn.py
+    ```
+    - The simulator generates user turns with the DeepEval model, so `OPENAI_API_KEY` must be set.
 5.  **Verify Results**:
-    - Review the test results in the terminal.
-    - Check the **Test Runs** section in Confident AI for detailed breakdowns of metric scores.
+    - Review the metric scores and failure reasons printed in the terminal.
+    - Investigate failures against the Langfuse traces from the same run.
+
+> [!NOTE]
+> Run both commands from the project root. The tests import helpers as `test.utils.*`, which only resolves from there.
 
 ---
-
-## Assignment 4: Langfuse Session Tracing
-
-### Goal
-Trace the chatbot to Langfuse and see every turn of a conversation grouped under a single **session**, attributed to the employee who ran it.
-
-### Background
-A single question to the chatbot produces one trace. That trace on its own tells you nothing about the conversation it belonged to. Langfuse **sessions** solve this by grouping related traces under a shared session ID, so you can replay a whole conversation in order.
-
-This project sets that up with `propagate_attributes()` from the Langfuse SDK. It is a context manager that writes trace-level attributes into the OpenTelemetry context. Every span created inside it inherits them. See `src/employee_chatbot/utils/crew_executor.py`.
-
-> [!IMPORTANT]
-> `propagate_attributes()` must wrap the creation of the root span, not sit inside it. Only the currently active span and spans created after entering the context receive the attributes. Entering it too late is what gets the nested CrewAI and LiteLLM spans left out.
-
-Two things make the propagation actually work:
-1. `get_client()` installs Langfuse's own span processor on the global tracer provider. A hand-rolled OTLP exporter does not read propagated values out of the OTEL context, so nothing would be stamped onto spans.
-2. The root span is created via `langfuse.start_as_current_observation()`. Langfuse's span processor drops spans that are neither its own nor from a known LLM instrumentor, so a hand-rolled tracer span would be silently discarded and the trace would be orphaned.
-
-### Steps
-1.  **Get your Langfuse keys**:
-    - Sign up at [cloud.langfuse.com](https://cloud.langfuse.com).
-    - Create an organization, then create a project (e.g. `employee-chatbot`). Each project has its own keys.
-    - Go to **Project Settings → API Keys** and copy the public and secret keys.
-2.  **Configure**: add `LANGFUSE_PUBLIC_KEY`, `LANGFUSE_SECRET_KEY` and `LANGFUSE_BASE_URL` to your `.env`.
-3.  **Run the Langfuse entry point**:
-    ```bash
-    uv run python -m src.employee_chatbot.crew
-    ```
-4.  **Interact**: enter an Employee ID, then send at least three turns in the same run.
-    - Ask a policy question (e.g., "What is the sick leave policy?").
-    - Apply for a leave (e.g., "I want to take leave from 20th May to 22nd May for a vacation").
-    - Ask about your history (e.g., "How many leaves have I taken so far?").
-    - Type `Bye` to exit.
-5.  **Observe** in the Langfuse dashboard:
-    - **Sessions**: one session holding all three turns as separate traces, in order.
-    - **Users**: traces attributed to the Employee ID you entered.
-    - Open a trace and confirm the root span `employee-chatbot-turn` has input and output, with CrewAI agent, task and tool spans plus LiteLLM generation spans (including token usage) nested beneath it.
-    - Click into a nested LiteLLM span and confirm it carries `session.id` and `user.id`. This is the proof that propagation reached the child spans, not just the root.
-6.  **Deep Dive**:
-    - The session ID is a fresh UUID per run, so one CLI run is one conversation. The same ID is reused as the AgentCore memory session.
-    - Try passing `metadata={...}` or extra `tags` to `propagate_attributes()` and filter on them in the dashboard. Metadata values are coerced to strings and capped at 200 characters.
