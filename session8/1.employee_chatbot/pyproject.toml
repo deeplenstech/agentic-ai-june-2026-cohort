@@ -17,7 +17,7 @@ dependencies = [
     "opentelemetry-exporter-otlp",
     "opentelemetry-sdk",
     "bedrock-agentcore>=1.8.0",
-    "deepeval>=3.9.6",
+    "langfuse>=4.14.3",
     "cedarpy>=4.8.4",
 ]
 
