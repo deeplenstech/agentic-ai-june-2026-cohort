@@ -142,7 +142,7 @@ The actual allow/deny decision is delegated to a pluggable [Authorizer](src/empl
 If `cedar` is requested but `cedarpy` or the policy file is unavailable, [get_authorizer()](src/employee_chatbot/utils/authz.py#L130-L145) logs and **falls back to the simple authorizer rather than failing open**.
 
 2. **AWS Bedrock Guardrails (Content & PII Defense)**:
-[LLMHooks](src/employee_chatbot/utils/llmHooks.py#L11-L41) registers `before_llm_call` / `after_llm_call` hooks that screen the user input and the model response against the configured AWS Bedrock Guardrail. Blocked content stops the call, and flagged-but-allowed PII is masked in place before it reaches the LLM or the database. See **[Setting up the Bedrock Guardrail](#setting-up-the-bedrock-guardrail)** below for configuration and a PII-masking walkthrough.
+[LLMHooks](src/employee_chatbot/utils/llm_hooks.py#L10-L40) registers `before_llm_call` / `after_llm_call` hooks that screen the user input and the model response against the configured AWS Bedrock Guardrail. Blocked content stops the call, and flagged-but-allowed PII is masked in place before it reaches the LLM or the database. See **[Setting up the Bedrock Guardrail](#setting-up-the-bedrock-guardrail)** below for configuration and a PII-masking walkthrough.
 
 3. **System Prompt Constraints (LLM-Level Defense)**:
 In [agent_v2.py](src/employee_chatbot/agent_v2.py#L56-L68), the agent's backstory is augmented with strict `System Constraints`:
@@ -171,7 +171,7 @@ GUARDRAIL_VERSION="1" # or "DRAFT"
 If `GUARDRAIL_ID` is unset, the guardrail hooks become a no-op and the agent runs with authorization + prompt constraints only.
 
 3. **How the Guardrail Hooks Work**:
-The screening logic lives in [guardrailUtils.py](src/employee_chatbot/utils/guardrailUtils.py) (`apply_guardrail_filters()` calls Bedrock's `apply_guardrail`), and the hooks are wired up by [LLMHooks](src/employee_chatbot/utils/llmHooks.py#L44-L94):
+The screening logic lives in [guardrailUtils.py](src/employee_chatbot/utils/guardrailUtils.py) (`apply_guardrail_filters()` calls Bedrock's `apply_guardrail`), and the hooks are wired up by [LLMHooks](src/employee_chatbot/utils/llm_hooks.py#L43-L93):
 - **Input Interception** (`before_llm_call`): scans each user message before it reaches the LLM. If the guardrail **BLOCKS**, the hook raises `GuardrailBlockedError` to stop the call; if it **MASKS**, it rewrites `msg["content"]` with the masked text (e.g. replacing phone numbers with `[PHONE]`) so the LLM never sees the raw PII.
 - **Output Interception** (`after_llm_call`): runs the same screening over the model's response before it is returned, blocking or masking as needed.
 

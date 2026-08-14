@@ -1,12 +1,13 @@
 import os
 from crewai import Agent, Crew, Task, LLM
-from .utils import bedrock_patches  # noqa: F401 — applies Bedrock monkey-patches on import
 from .tools import InsertLeaveTool, ReadLeavesTool, GetCurrentDateTool
-from .utils.llmHooks import LLMHooks
+from .utils.llm_hooks import LLMHooks
 from .utils.toolHooks import ToolHooks
 from .utils.memory import MemoryUtils
 from crewai_tools import BedrockKBRetrieverTool
 from crewai.utilities.i18n import I18N
+from .utils.llm_factory import get_llm
+from .utils.executor import execute
 
 class NoExpectedOutputTask(Task):
     """Task that omits the 'expected criteria for your final answer' section
@@ -67,10 +68,7 @@ def createCrew(memory: MemoryUtils = None):
             "inform the employee and insert the leaves. \n"
             "Employee ID: {employee_id} \n\n"
         ),
-        llm=LLM(
-            model=os.environ["MODEL_ID"],
-            temperature=0,
-        ),
+        llm=get_llm(),
         tools=[
             kb_tool,
             InsertLeaveTool(),
@@ -94,3 +92,10 @@ def createCrew(memory: MemoryUtils = None):
         verbose=False
     )
 
+def run():
+    # createCrew is passed uncalled: execute() builds the MemoryUtils for the
+    # session first, then calls it with that memory.
+    execute(createCrew)
+
+if __name__ == "__main__":
+    run()

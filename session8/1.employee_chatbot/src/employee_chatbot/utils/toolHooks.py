@@ -1,7 +1,7 @@
 """CrewAI tool-call hooks for the employee chatbot.
 
 This is the *enforcement point* for tool access control. It mirrors the LLM
-hooks in :mod:`employee_chatbot.utils.llmHooks`, but registers a
+hooks in :mod:`employee_chatbot.utils.llm_hooks`, but registers a
 ``before_tool_call`` hook that runs before the leave tools execute.
 
 Keeping the check here (rather than inside each tool's ``_run``) is closer to a

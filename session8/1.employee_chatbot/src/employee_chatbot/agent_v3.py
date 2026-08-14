@@ -7,9 +7,10 @@ from crewai import Agent, Crew, Task, LLM
 from .tools import InsertLeaveTool, ReadLeavesTool, GetCurrentDateTool, LeaveType as ToolLeaveType
 from crewai_tools import BedrockKBRetrieverTool
 from dotenv import load_dotenv
-from .utils import bedrock_patches  # noqa: F401
-from .utils.llmHooks import LLMHooks
+from .utils.llm_hooks import LLMHooks
 from .utils.memory import MemoryUtils
+from .utils.llm_factory import get_llm
+from .utils.executor import execute
 
 load_dotenv()
 
@@ -89,7 +90,7 @@ class EmployeeChatbotFlow(Flow[EmployeeFlowState]):
                 "requests to apply for leave, requests to view leave history, and queries about company policies. "
                 "You extract dates and types accurately to ensure downstream agents have clean data."
             ),
-            llm=LLM(model=os.environ["MODEL_ID"]),
+            llm=get_llm(),
             tools=[GetCurrentDateTool()]
         )
         
@@ -138,7 +139,7 @@ class EmployeeChatbotFlow(Flow[EmployeeFlowState]):
                 "You are a specialized HR agent focused only on leave management. You rely on "
                 "the parameters provided by the router to execute your tasks accurately."
             ),
-            llm=LLM(model=os.environ["MODEL_ID"], temperature=0),
+            llm=get_llm(),
             tools=[InsertLeaveTool(), ReadLeavesTool(), kb_tool]
         )
         
@@ -181,7 +182,7 @@ class EmployeeChatbotFlow(Flow[EmployeeFlowState]):
                 "You are a policy expert. You answer employee questions based strictly on the "
                 "official company documentation retrieved from your knowledge base."
             ),
-            llm=LLM(model=os.environ["MODEL_ID"], temperature=0),
+            llm=get_llm(),
             tools=[kb_tool]
         )
         
@@ -202,3 +203,11 @@ class EmployeeChatbotFlow(Flow[EmployeeFlowState]):
     def handle_unsupported(self):
         """Fallback for cases where the router cannot classify the request."""
         self.state.final_response = "I'm sorry, I couldn't understand if you wanted to manage leaves or access policies. Could you please rephrase your request?"
+
+def run():
+    # The class is passed uninstantiated: execute() builds the MemoryUtils for
+    # the session first, then calls it with that memory.
+    execute(EmployeeChatbotFlow)
+
+if __name__ == "__main__":
+    run()

@@ -1,7 +1,6 @@
 import logging
 
 from crewai.hooks import after_llm_call, before_llm_call
-
 from .guardrailUtils import GuardrailBlockedError, apply_guardrail_filters
 from .memory import MemoryUtils
 
@@ -93,20 +92,21 @@ class LLMHooks:
 
             return None
 
-    # ── Short-term memory ───────────────────────────────────────────────────────
+    # ── memory ───────────────────────────────────────────────────────
     def _register_memory(self):
-        """Register the pre-LLM hook that loads short-term memory."""
+        """Register the pre-LLM hook that loads memory."""
 
         @before_llm_call
         def load_memory_before_llm(context):
-            """Load short-term memory and inject it ahead of the current query."""
+            """Load memory and inject it ahead of the current query."""
             if self.memory is None or not context.messages:
                 return None
 
             try:
                 history = self.memory.loadShortTermMemory()
+                summary = self.memory.extractSummary()
             except Exception as e:
-                logger.error(f"Failed to load short-term memory: {str(e)}")
+                logger.error(f"Failed to load memory: {str(e)}")
                 return None
 
             if not history:
@@ -130,7 +130,11 @@ class LLMHooks:
                 None,
             )
             insert_at = first_system + 1 if first_system is not None else 0
-            context.messages[insert_at:insert_at] = history
+            offset = 0
+            if summary:
+                context.messages.insert(insert_at, summary)
+                offset = 1
+            context.messages[insert_at+offset:insert_at+offset] = history
 
             logger.info(f"Injected {len(history)} short-term memory message(s).")
             return None
